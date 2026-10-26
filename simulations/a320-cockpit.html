@@ -627,7 +627,8 @@ function dragGrab(){const it=grab,du=cur.u-g0.u,dv=cur.v-g0.v;
 function inputStep(dt){
   const A=gloveTilt&&gloveNeutralTilt;live=connected&&performance.now()-lastPacketAt<1500&&A;let tu,tv,g;
   if(live){tu=clamp((gloveTilt.roll-gloveNeutralTilt.roll)/.7,-1,1);tv=clamp(-(gloveTilt.pitch-gloveNeutralTilt.pitch)/.7,-1,1);g=gloveGripValue()}
-  else{tu=mouse.u;tv=mouse.v;g=(down.l||down.r||keys.Space)?1:0}
+  else{if(isVR){tu=0;tv=0}else{tu=mouse.u;tv=mouse.v} /* VR box: the hand follows your gaze (screen centre); tap the screen to grab */
+    g=(down.l||down.r||keys.Space)?1:0}
   /* adaptive low-pass (One-Euro style): slow motion is heavily smoothed (kills jitter), fast motion stays responsive */
   const sp=Math.hypot(tu-cur.u,tv-cur.v)/Math.max(dt,.001),rate=live?clamp(5+sp*14,5,40):40,kk=1-Math.exp(-rate*dt);
   cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;gripS+=(g-gripS)*(1-Math.exp(-dt*18));
@@ -705,8 +706,10 @@ function renderRoom(){
     const ex=Math.round(cx+(i?1:-1)*H*VRL.sep-side/2),ey=Math.round(H-cy-side/2); /* GL origin is bottom-left */
     distMat.uniforms.sx.value=i?-off:off;ren.setScissorTest(true);ren.setViewport(ex,ey,side,side);ren.setScissor(ex,ey,side,side);ren.render(qScene,qCam)});
   ren.setScissorTest(false);ren.setViewport(0,0,W,H)}
+let absSeen=false;
 function onOrientation(event){
-  if(!gyroEnabled||event.alpha==null)return;gotOrientation=true;
+  if(event.type==='deviceorientationabsolute')absSeen=true;else if(absSeen)return; /* prefer the absolute event when the phone sends it, never mix the two */
+  if(!gyroEnabled||event.beta==null&&event.gamma==null)return;gotOrientation=true;
   const orientation=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*D2R;
   tmpEuler.set((event.beta||0)*D2R,(event.alpha||0)*D2R,-(event.gamma||0)*D2R,'YXZ');
   deviceQ.setFromEuler(tmpEuler).multiply(qBack).multiply(new THREE.Quaternion().setFromAxisAngle(Z,-orientation));
@@ -719,7 +722,9 @@ window.enableGyro=async()=>{
   if(gyroEnabled)return;const O=window.DeviceOrientationEvent;
   if(O&&typeof O.requestPermission==='function'){try{const p=await O.requestPermission();if(p!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
   gyroEnabled=true;gotOrientation=false;recenterPending=true;$('gyroBtn').textContent='Gyro: ON';
-  setTimeout(()=>{if(!gotOrientation){gyroEnabled=false;$('gyroBtn').textContent='Enable gyro';say('No device orientation data received. Use a motion-enabled phone over HTTPS, or the arrow keys / WASD.')}},1800)};
+  if(!window.isSecureContext)say('Gyro needs HTTPS (or localhost). On plain http:// the phone blocks motion sensors, so open this page over https://.');
+  /* keep listening: some phones need several seconds before the first reading. Only warn, never switch the gyro off. */
+  setTimeout(()=>{if(!gotOrientation){$('gyroBtn').textContent='Gyro: waiting…';say('No motion data yet. Check: page opened over HTTPS, Chrome site settings > Motion sensors = Allowed, phone auto-rotate on. Meanwhile drag a finger on the screen to look around.')}},4000)};
 window.toggleVRBox=async()=>{
   isVR=!isVR;document.body.classList.toggle('vr',isVR);
   if(isVR){$('ui').classList.add('closed');$('bp').classList.remove('open');document.body.classList.remove('nohud')}
@@ -727,7 +732,9 @@ window.toggleVRBox=async()=>{
   if(isVR&&!gyroEnabled)await window.enableGyro();
   if(isVR){setTimeout(()=>{recenterPending=true},3000);try{await document.documentElement.requestFullscreen()}catch(e){}try{await screen.orientation.lock('landscape')}catch(e){}}
   else{try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}try{screen.orientation.unlock()}catch(e){}}};
-addEventListener('deviceorientation',onOrientation);addEventListener('resize',()=>resize());
+addEventListener('deviceorientation',onOrientation);addEventListener('deviceorientationabsolute',onOrientation);addEventListener('resize',()=>resize());
+/* VR fallback: if the gyro gives no data, dragging a finger turns the head */
+addEventListener('pointermove',e=>{if(isVR&&!gotOrientation&&e.buttons&1&&e.pointerType!=='mouse'||isVR&&!gotOrientation&&e.buttons&1){look.goal=null;look.yaw+=e.movementX*.004;look.pitch=clamp(look.pitch+e.movementY*.004,-1.2,1.35)}});
 document.querySelectorAll('.move-btn').forEach(b=>{const k=b.dataset.key,stop=()=>{keys[k]=false};
   b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,stop))});
 
