@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><script src="../assets/auth.js"></script><script>SimuAuth.guard()</script>
+<html lang="en"><head><meta charset="UTF-8"><script src="../assets/auth.js"></script><script>try{if(window.SimuAuth&&SimuAuth.guard)SimuAuth.guard()}catch(e){console.warn("SimuAuth guard skipped",e)}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>A320 VR Cockpit Trainer</title>
 <style>
@@ -45,7 +45,9 @@ button.p{background:#0f8f80}
 #bp h3{font-size:.9rem;margin:14px 0 4px;color:var(--teal)}#bp ul,#bp ol{margin:4px 0 8px;padding-left:22px}#bp li{margin:3px 0}#bp code{background:#ffffff14;padding:1px 5px;border-radius:4px;font-size:.82rem}
 #bp table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.82rem}#bp td,#bp th{border:1px solid #ffffff24;padding:6px 8px;text-align:left;vertical-align:top}#bp th{color:var(--teal)}
 #bpx{position:fixed;z-index:75;top:calc(12px + env(safe-area-inset-top));right:14px}
-body.vr .panel,body.vr #top,body.vr #bar,body.vr #ui,body.vr #menuBtn{display:none}body.vr #exitVR{display:block}
+body.vr{background:#000 !important}
+body.vr .panel,body.vr #top,body.vr #bar,body.vr #ui,body.vr #menuBtn,body.vr #bp,body.vr #bpx,body.vr #help,body.vr #warn{display:none !important}
+body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px;bottom:6px}
 @media(orientation:portrait){body.vr #rotate{display:flex}}
 @media(max-width:820px){.panel{width:150px;font-size:.68rem;padding:9px}#L .big span{font-size:1.6rem}#cue{font-size:.64rem;min-height:0}}
 .panel{opacity:.85;transition:opacity .2s}.panel:hover{opacity:1}#bar button{background:#0e1d23a8;backdrop-filter:blur(6px);min-height:38px;padding:7px 11px;font-size:.72rem}body.nohud .panel,body.nohud #bar,body.nohud #top{display:none}
@@ -166,8 +168,8 @@ const calibration=Object.fromEntries(fingerKeys.map(k=>[k,{straight:0,bent:100}]
 try{const s=JSON.parse(localStorage.getItem('anesthesia_calibration')||'null');if(s&&typeof s==='object')for(const k of fingerKeys){const c=s[k];if(c&&Number.isFinite(c.straight)&&Number.isFinite(c.bent)&&c.straight>=0&&c.straight<=100&&c.bent>=0&&c.bent<=100&&c.straight!==c.bent)calibration[k]=c}}catch(e){console.warn('Saved glove calibration could not be loaded.',e)}
 let connected=false,connecting=false,data={},lastPacketAt=0,pollController=null,connectionAttempt=0,gloveTilt=null,gloveNeutralTilt=null,gloveGrab=false;
 const say=t=>{$('cue').textContent=t};
-window.toggleMenu=()=>$('ui').classList.toggle('closed');
-window.toggleBP=()=>$('bp').classList.toggle('open');
+window.toggleMenu=()=>{if(document.body.classList.contains('vr'))return;$('ui').classList.toggle('closed')};
+window.toggleBP=()=>{if(document.body.classList.contains('vr'))return;$('bp').classList.toggle('open')};
 window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};say('Glove pose centered. Tilt the glove to steer the hand.')};
 window.saveCalibration=()=>{for(const k of fingerKeys){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter valid straight,bent readings from 0 to 100 for the ${k}.`);return}calibration[k]={straight:p[0],bent:p[1]}}
   try{localStorage.setItem('anesthesia_calibration',JSON.stringify(calibration))}catch(e){say('Calibration could not be saved in this browser.');return}say('Calibration saved. Flex the fingers to verify.')};
@@ -452,8 +454,14 @@ const hand=new THREE.Group();scene.add(hand);const HS=.75;hand.scale.setScalar(H
   const th=new THREE.Group();th.position.set(-.05,0,-.01);th.rotation.set(-.2,.7,0);h.add(th);sph(th,glove,[0,0,-.045],[.022,.016,.06]);
   const tj=new THREE.Group();tj.position.set(0,0,-.085);th.add(tj);sph(tj,glove,[0,0,-.035],[.017,.014,.045]);sph(tj,node,[0,.01,-.07],[.005,.005,.005]);
   handParts.push({key:'thumb',root:th,joint:tj,tip:tj})}
-let handSide=1;
-window.switchHand=()=>{handSide=-handSide;hand.scale.x=HS*handSide;say(handSide>0?'Right hand selected.':'Left hand selected.')};
+let handSide=1,handK=1;
+const applyHandScale=()=>hand.scale.set(HS*handK*handSide,HS*handK,HS*handK);
+/* in VR the glove is drawn on top of the panels (no depth clipping) so it can never vanish inside a control or the near plane */
+const handMats=new Set();hand.traverse(o=>{if(o.material)handMats.add(o.material)});
+function handOnTop(on){for(const m of handMats){m.depthTest=!on;m.needsUpdate=true}hand.traverse(o=>{o.frustumCulled=false;if(o.isMesh)o.renderOrder=on?20:0})}
+window.switchHand=()=>{handSide=-handSide;applyHandScale();say(handSide>0?'Right hand selected.':'Left hand selected.')};
+/* small fingertip cursor, shown only in VR */
+const reticle=new THREE.Mesh(new THREE.SphereGeometry(.008,12,8),new THREE.MeshBasicMaterial({color:0x35e6d0,depthTest:false,transparent:true,opacity:.9,toneMapped:false}));reticle.renderOrder=30;reticle.visible=false;reticle.frustumCulled=false;scene.add(reticle);
 /* amber ring that marks the next control */
 const mark=new THREE.Mesh(new THREE.TorusGeometry(.06,.005,8,36),new THREE.MeshBasicMaterial({color:0xffb547,depthTest:false,transparent:true,opacity:.95,toneMapped:false}));mark.renderOrder=15;mark.visible=false;scene.add(mark);
 
@@ -643,6 +651,11 @@ function inputStep(dt){
   const rt=tmpR.set(1,0,0).applyQuaternion(cam.quaternion),up=tmpU.set(0,1,0).applyQuaternion(cam.quaternion),tp=tmpV;
   if(hasHit)tp.copy(hitPt).addScaledVector(dirV,-REACH+(gOn?.012:0)).addScaledVector(rt,.07*handSide).addScaledVector(up,-.07);
   else tp.copy(cam.position).addScaledVector(dirV,.55).addScaledVector(rt,.2*handSide).addScaledVector(up,-.24); /* resting pose: low and to the side, view stays clear */
+  if(isVR){ /* keep the glove comfortably in front of both eyes: at least 0.32 m from the head */
+    const dx=tp.x-cam.position.x,dy=tp.y-cam.position.y,dz=tp.z-cam.position.z,L=Math.hypot(dx,dy,dz);
+    if(L<.32&&L>1e-4){const s=.32/L;tp.set(cam.position.x+dx*s,cam.position.y+dy*s,cam.position.z+dz*s)}
+    reticle.visible=true;reticle.position.copy(hasHit?hitPt:tmpW.copy(cam.position).addScaledVector(dirV,1.2))}
+  else reticle.visible=false;
   hand.position.lerp(tp,1-Math.exp(-dt*22));aimV.copy(hasHit?hitPt:tmpW.copy(cam.position).addScaledVector(dirV,2)).sub(hand.position);hand.lookAt(hand.position.clone().sub(aimV))}
 
 /* =====================================================================
@@ -674,16 +687,24 @@ const distMat=new THREE.ShaderMaterial({uniforms:{t:{value:eyeRT.texture},k:{val
   vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
   fragmentShader:['uniform sampler2D t;uniform float k;uniform float sx;varying vec2 v;','void main(){vec2 c=v*2.-1.;vec2 d=c*(1.+k*dot(c,c));vec2 u=d*.5+.5+vec2(sx,0.);','gl_FragColor=(u.x<0.||u.x>1.||u.y<0.||u.y>1.)?vec4(0.,0.,0.,1.):texture2D(t,u);','#include <tonemapping_fragment>','#include <colorspace_fragment>','}'].join('\n')});
 const qScene=new THREE.Scene();qScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),distMat));const qCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
-function resize(){cam.aspect=innerWidth/innerHeight;cam.fov=isVR?90:70;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)}
+/* VR layout measured from the reference screenshot (fire/medical trainers):
+   each eye is a SQUARE view = 0.815 x screen height, eye centres sit 0.43 x height either side of the
+   screen centre line and 0.543 x height from the top, everything else is pure black. */
+const VRL={size:.815,sep:.43,cy:.543};
+function resize(){const vw=innerWidth,vh=innerHeight;cam.aspect=isVR?1:vw/vh;stereo.aspect=1;cam.fov=isVR?90:70;cam.updateProjectionMatrix();ren.setSize(vw,vh)}
 function renderRoom(){
-  if(!isVR){ren.setViewport(0,0,innerWidth,innerHeight);ren.setScissorTest(false);ren.render(scene,cam);return}
-  const w=Math.floor(innerWidth/2),h=innerHeight,pr=ren.getPixelRatio();
-  eyeRT.setSize(Math.max(2,w*pr),Math.max(2,h*pr));cam.updateMatrixWorld();stereo.update(cam);
+  if(!isVR){ren.setRenderTarget(null);ren.setScissorTest(false);ren.setViewport(0,0,innerWidth,innerHeight);ren.render(scene,cam);return}
+  const W=innerWidth,H=innerHeight,pr=ren.getPixelRatio(),side=Math.round(H*VRL.size),cx=W/2,cy=H*VRL.cy;
+  cam.aspect=1;cam.updateProjectionMatrix();stereo.aspect=1;
+  const px=Math.max(2,Math.round(side*pr));if(eyeRT.width!==px)eyeRT.setSize(px,px);
+  cam.updateMatrixWorld();stereo.update(cam);
   distMat.uniforms.k.value=Number($('lens').value)/100*.5;const off=(Number($('align').value)-5)*.012;
+  ren.setRenderTarget(null);ren.setScissorTest(false);ren.setViewport(0,0,W,H);ren.setClearColor(0x000000,1);ren.clear(); /* black everywhere outside the two eye views */
   [stereo.cameraL,stereo.cameraR].forEach((c,i)=>{
-    ren.setRenderTarget(eyeRT);ren.render(scene,c);ren.setRenderTarget(null);
-    distMat.uniforms.sx.value=i?-off:off;ren.setScissorTest(true);ren.setViewport(i*w,0,w,h);ren.setScissor(i*w,0,w,h);ren.render(qScene,qCam)});
-  ren.setScissorTest(false)}
+    ren.setRenderTarget(eyeRT);ren.setViewport(0,0,side,side);ren.setScissorTest(false);ren.render(scene,c);ren.setRenderTarget(null);
+    const ex=Math.round(cx+(i?1:-1)*H*VRL.sep-side/2),ey=Math.round(H-cy-side/2); /* GL origin is bottom-left */
+    distMat.uniforms.sx.value=i?-off:off;ren.setScissorTest(true);ren.setViewport(ex,ey,side,side);ren.setScissor(ex,ey,side,side);ren.render(qScene,qCam)});
+  ren.setScissorTest(false);ren.setViewport(0,0,W,H)}
 function onOrientation(event){
   if(!gyroEnabled||event.alpha==null)return;gotOrientation=true;
   const orientation=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*D2R;
@@ -700,7 +721,9 @@ window.enableGyro=async()=>{
   gyroEnabled=true;gotOrientation=false;recenterPending=true;$('gyroBtn').textContent='Gyro: ON';
   setTimeout(()=>{if(!gotOrientation){gyroEnabled=false;$('gyroBtn').textContent='Enable gyro';say('No device orientation data received. Use a motion-enabled phone over HTTPS, or the arrow keys / WASD.')}},1800)};
 window.toggleVRBox=async()=>{
-  isVR=!isVR;document.body.classList.toggle('vr',isVR);resize();
+  isVR=!isVR;document.body.classList.toggle('vr',isVR);
+  if(isVR){$('ui').classList.add('closed');$('bp').classList.remove('open');document.body.classList.remove('nohud')}
+  handK=isVR?1.5:1;applyHandScale();handOnTop(isVR);resize();
   if(isVR&&!gyroEnabled)await window.enableGyro();
   if(isVR){setTimeout(()=>{recenterPending=true},3000);try{await document.documentElement.requestFullscreen()}catch(e){}try{await screen.orientation.lock('landscape')}catch(e){}}
   else{try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}try{screen.orientation.unlock()}catch(e){}}};
