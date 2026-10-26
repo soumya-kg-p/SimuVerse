@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><script src="../assets/auth.js"></script><script>SimuAuth.guard()</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laparoscopic Cholecystectomy Trainer</title>
+<style>
+:root{color-scheme:dark;--ink:#e9f4f5;--dim:#8aa9b1;--teal:#35e6d0;--amber:#ffb547;--red:#ff5d4d;--glass:#0b161bd9;font-family:"Segoe UI",system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#dfe7e7;color:var(--ink);user-select:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block;touch-action:none}
+.panel{position:fixed;z-index:5;top:calc(64px + env(safe-area-inset-top));width:min(236px,30vw);padding:12px 14px;background:var(--glass);border:1px solid #35e6d033;border-radius:12px;backdrop-filter:blur(10px);font-size:.76rem}
+#L{left:12px}#R{right:12px}
+.panel h2{margin:0 0 8px;font-size:.78rem;font-weight:650;color:var(--teal);letter-spacing:.02em}
+#steps{margin:0;padding:0;list-style:none;color:var(--dim)}#steps li{padding:3px 0 3px 17px;position:relative;line-height:1.3}
+#steps li:before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;border-radius:50%;border:1px solid var(--dim)}
+#steps li.done{color:var(--teal)}#steps li.done:before{background:var(--teal);border-color:var(--teal)}
+#steps li.cur{color:var(--ink);font-weight:600}#steps li.cur:before{background:var(--amber);border-color:var(--amber)}
+.big{display:flex;align-items:baseline;gap:6px;margin:10px 0 4px;font-variant-numeric:tabular-nums}.big span{font-size:2.3rem;font-weight:300;line-height:1}.big small{color:var(--dim)}
+#cue{margin:6px 0 0;padding-top:8px;border-top:1px solid #ffffff18;line-height:1.4;min-height:4.2em}
+#tool-guide{margin:6px 0;color:var(--dim);font-size:.68rem;line-height:1.4}
+.m{margin:7px 0}.m div.t{display:flex;justify-content:space-between;color:var(--dim);margin-bottom:3px;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:#ffffff14;overflow:hidden;position:relative}.bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .08s}
+.bar i.hot{background:var(--red)}.bar:after{content:"";position:absolute;left:76%;top:0;bottom:0;width:1px;background:#ffffff66}
+.bar.f:after{display:none}
+#warn{height:1.2em;color:var(--red);font-weight:600;margin-top:6px}
+#top{position:fixed;z-index:5;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:8px 16px;background:var(--glass);border:1px solid #35e6d033;border-radius:99px;font-size:.8rem;white-space:nowrap;max-width:calc(100vw - 80px);overflow:hidden;text-overflow:ellipsis}
+#top b{font-weight:650}#tool{color:var(--amber);margin-left:10px}
+#bar{position:fixed;z-index:5;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:calc(100vw - 24px)}
+button{font:inherit;font-size:.78rem;font-weight:600;color:var(--ink);background:#14262dea;border:1px solid #35e6d044;border-radius:9px;padding:10px 14px;min-height:44px;cursor:pointer}
+button:active{background:#1d3a44}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.p{background:#0f8f80}
+#menuBtn{position:fixed;z-index:9;top:calc(12px + env(safe-area-inset-top));left:12px;width:44px;padding:0}
+#ui{position:fixed;z-index:8;top:calc(64px + env(safe-area-inset-top));left:12px;width:min(270px,calc(100vw - 24px));max-height:calc(100vh - 150px);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:7px;background:#0b161bf2;border:1px solid #35e6d033;border-radius:12px;font-size:.74rem}
+#ui.closed{display:none}#ui label,#ui summary{color:var(--dim);font-weight:600}
+#ui input{width:100%;padding:9px;font-size:16px;background:#071014;color:var(--ink);border:1px solid #3d5863;border-radius:7px}
+#ui small{color:var(--dim);line-height:1.4}#ui .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}#ui .w{grid-column:1/-1}
+#ui .cal{display:grid;grid-template-columns:1fr 1.3fr;gap:5px;align-items:center;margin:4px 0}#ui .cal input{padding:5px;font-size:12px}
+#help{margin:0;padding:7px;border:1px solid #ffb54777;border-radius:8px;background:#5a380f55;color:#ffe2a8;line-height:1.4}
+#dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px}#dot.on{background:#3ddc7a;box-shadow:0 0 8px #3ddc7a}
+#ui .mg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}#ui .mg button{min-height:40px;touch-action:none;padding:6px}
+#ui .mg button:nth-child(1){grid-column:2}#ui .mg button:nth-child(2){grid-column:1;grid-row:2}#ui .mg button:nth-child(3){grid-column:2;grid-row:2}#ui .mg button:nth-child(4){grid-column:3;grid-row:2}
+#ui input[type=range]{padding:0;accent-color:#35e6d0}
+#exitVR{display:none;position:fixed;z-index:50;bottom:12px;left:50%;width:44px;height:44px;transform:translateX(-50%);border-radius:50%;padding:0}
+#rotate{display:none;position:fixed;z-index:60;inset:0;align-items:center;justify-content:center;padding:30px;background:#07131a;text-align:center;font-size:1rem}
+body.vr .panel,body.vr #top,body.vr #bar,body.vr #ui,body.vr #menuBtn{display:none}body.vr #exitVR{display:block}
+@media(orientation:portrait){body.vr #rotate{display:flex}}
+@media(max-width:820px){.panel{width:150px;font-size:.68rem;padding:9px}#L .big span{font-size:1.6rem}#cue{display:block;min-height:0;font-size:.64rem}#tool-guide{font-size:.62rem}}
+</style></head><body>
+<div id="top"><b>Laparoscopic cholecystectomy trainer</b><span id="tool"></span></div>
+<button id="menuBtn" onclick="toggleMenu()" aria-label="Glove connection and calibration">⚙</button>
+<aside id="L" class="panel" aria-label="Procedure"><h2>Procedure</h2><ol id="steps"></ol>
+<p id="tool-guide"><b>Using the sticks:</b> Tilt the glove (or move the mouse) to steer the active tool tip. Point it at the glowing target ring. Squeeze and hold for a firm grip; partially bend fingers for a light grip. Relax to release. Mouse: hold left for firm grip; Shift+left or right-click for light grip. Tab switches tools.</p>
+<div class="big"><span id="acc">100</span><small>% accuracy</small></div><p id="cue"></p></aside>
+<aside id="R" class="panel" aria-label="Telemetry"><h2>Glove telemetry</h2>
+<div class="m"><div class="t"><span>Left grasper force</span><span id="f0">0.0 N</span></div><div class="bar f"><i id="b0"></i></div></div>
+<div class="m"><div class="t"><span>Right hook force</span><span id="f1">0.0 N</span></div><div class="bar f"><i id="b1"></i></div></div>
+<div class="m"><div class="t"><span>Thumb</span><span id="v0">—</span></div><div class="bar f"><i id="s0"></i></div></div>
+<div class="m"><div class="t"><span>Index</span><span id="v1">—</span></div><div class="bar f"><i id="s1"></i></div></div>
+<div class="m"><div class="t"><span>Middle</span><span id="v2">—</span></div><div class="bar f"><i id="s2"></i></div></div>
+<div class="m"><div class="t"><span>Ring</span><span id="v3">—</span></div><div class="bar f"><i id="s3"></i></div></div>
+<div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Time</span><span id="tm">0:00</span></div>
+<div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Instrument path</span><span id="pth">0.0 m</span></div>
+<div id="warn"></div><div id="conn" style="margin-top:6px;color:var(--dim)"><span id="dot"></span><span id="ct">Glove: not connected (mouse mode)</span></div></aside>
+<div id="bar"><button class="p" onclick="switchTool()">Switch tool (Tab)</button><button onclick="centerGlove()">Center glove</button><button onclick="restart()">Restart</button></div>
+<aside id="ui" class="closed" aria-label="Glove connection">
+<label for="ip">ESP32 glove address</label><input id="ip" value="10.82.107.166" inputmode="decimal" autocomplete="off">
+<small>Use the IP printed in the ESP32 Serial Monitor. It can change when the glove reconnects to Wi-Fi.</small>
+<div class="g2"><button class="p w" onclick="connectESP()">Connect glove</button><button class="w" onclick="openGloveData()">Test /data in browser</button><button class="w" onclick="disconnectESP()">Disconnect glove</button></div>
+<p id="help" role="status" hidden></p>
+<div class="g2"><button onclick="startTraining()">Start training</button><button onclick="restart()">Restart</button><button onclick="recenter()">Recenter view</button><button onclick="resetPosition()">Reset position</button>
+<button class="w" onclick="releaseHeldItem()">Release held tissue</button><button id="gyroBtn" onclick="enableGyro()">Enable gyro</button><button class="p" onclick="toggleVRBox()">VR Box</button></div>
+<label>Move around (hold)</label><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
+<details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0 to 100) per finger.</small>
+<div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
+<div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
+<div class="g2"><button onclick="saveCalibration()">Save</button><button onclick="resetCalibration()">Reset</button></div></details>
+<details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
+<small><b>Mouse mode:</b> move to steer the active tool, hold left button to grip firmly, Shift or right button for light grip (cautery), Tab to switch tool.</small>
+</aside>
+
+<button id="exitVR" onclick="toggleVRBox()" aria-label="Exit VR">✕</button>
+<div id="rotate">Rotate your phone to landscape, then place it in the VR box.</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+const $=id=>document.getElementById(id);
+const clamp=THREE.MathUtils.clamp;
+
+/* =====================================================================
+   BACKEND: ESP32 glove (kept from the original simulator)
+   ===================================================================== */
+const fingerKeys=['thumb','index','middle','ring'];
+const fingerAliases={thumb:['thumb','th','f0','t','flex1','flex_1','sensor1','sensor_1'],index:['index','i','f1','flex2','flex_2','sensor2','sensor_2'],middle:['middle','m','f2','flex3','flex_3','sensor3','sensor_3'],ring:['ring','r','f3','flex4','flex_4','sensor4','sensor_4']};
+const calibration=Object.fromEntries(fingerKeys.map(k=>[k,{straight:0,bent:100}]));
+try{const s=JSON.parse(localStorage.getItem('anesthesia_calibration')||'null');if(s&&typeof s==='object')for(const k of fingerKeys){const c=s[k];if(c&&Number.isFinite(c.straight)&&Number.isFinite(c.bent)&&c.straight>=0&&c.straight<=100&&c.bent>=0&&c.bent<=100&&c.straight!==c.bent)calibration[k]=c}}catch(e){console.warn('Saved glove calibration could not be loaded.',e)}
+let connected=false,connecting=false,data={},lastPacketAt=0,pollController=null,connectionAttempt=0,gloveTilt=null,gloveNeutralTilt=null,gloveGrab=false;
+const say=t=>{$('cue').textContent=t};
+window.toggleMenu=()=>$('ui').classList.toggle('closed');
+window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};say('Glove pose centered. Tilt the glove to steer the instrument.')};
+window.saveCalibration=()=>{for(const k of fingerKeys){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter valid straight,bent readings from 0 to 100 for the ${k}.`);return}calibration[k]={straight:p[0],bent:p[1]}}
+  try{localStorage.setItem('anesthesia_calibration',JSON.stringify(calibration))}catch(e){say('Calibration could not be saved in this browser.');return}say('Calibration saved. Flex the fingers to verify.')};
+window.resetCalibration=()=>{for(const k of fingerKeys){calibration[k]={straight:0,bent:100};$('cal-'+k).value=''}try{localStorage.removeItem('anesthesia_calibration')}catch(e){}};
+function sensorValue(key,packet=data){for(const src of [packet.flex,packet.fingers,packet]){if(!src||typeof src!=='object')continue;
+  if(Array.isArray(src)){const v=src[fingerKeys.indexOf(key)];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v);continue}
+  for(const a of fingerAliases[key]){const v=src[a];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v)}}return null}
+function normalizeSensor(key,value){if(!Number.isFinite(value))return null;const c=calibration[key];return clamp((value-c.straight)/(c.bent-c.straight),0,1)}
+const hasValidSensorPacket=p=>fingerKeys.some(k=>sensorValue(k,p)!==null);
+function updateGloveTilt(p){const{ax,ay,az}=p;if(![ax,ay,az].every(v=>Number.isFinite(Number(v))))return;const x=+ax,y=+ay,z=+az;if(Math.hypot(x,y,z)<.1)return;
+  gloveTilt={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
+function showConnectionHelp(t){const h=$('help');h.textContent=t;h.hidden=!t}
+const IPRE=/^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const POLL_MS=200;
+const setConn=(on,text)=>{$('dot').classList.toggle('on',on);$('ct').textContent=text};
+window.disconnectESP=()=>{connectionAttempt++;connected=connecting=gloveGrab=false;if(pollController){pollController.abort();pollController=null}setConn(false,'Glove: not connected (mouse mode)');showConnectionHelp('')};
+window.openGloveData=()=>{const ip=$('ip').value.trim();if(!IPRE.test(ip)){showConnectionHelp('Enter the current IPv4 address printed in the ESP32 Serial Monitor first.');return}window.open(`http://${ip}/data`,'_blank','noopener,noreferrer')};
+window.connectESP=async()=>{
+  const ip=$('ip').value.trim();
+  if(!IPRE.test(ip)){setConn(false,'Invalid ESP32 IP address');showConnectionHelp('Enter the glove’s current IPv4 address (for example, 192.168.1.50).');return}
+  if(connecting)return;const attempt=++connectionAttempt;connecting=true;connected=false;setConn(false,'Glove: connecting…');showConnectionHelp('');
+  while(connecting&&attempt===connectionAttempt){
+    const controller=new AbortController();pollController=controller;let to,timedOut=false;
+    try{to=setTimeout(()=>{timedOut=true;controller.abort()},1800);
+      const r=await fetch(`http://${ip}/data`,{signal:controller.signal,cache:'no-store'});if(!r.ok)throw new Error(`ESP32 returned HTTP ${r.status}`);
+      const p=await r.json();if(!p||typeof p!=='object'||Array.isArray(p)||!hasValidSensorPacket(p))throw new Error('ESP32 packet contains no valid finger sensor readings.');
+      if(attempt!==connectionAttempt)break;
+      data={...data,...p};updateGloveTilt(p);lastPacketAt=performance.now();connected=true;setConn(true,'Glove: connected');showConnectionHelp('');gloveGrab=Number(p.click)===1;
+    }catch(error){
+      if(!connecting||attempt!==connectionAttempt)break;connected=gloveGrab=false;setConn(false,'Glove: reconnecting…');const url=`http://${ip}/data`;
+      if(timedOut)showConnectionHelp(`Timed out contacting ${url}. Confirm this is the current IP, the ESP32 is on Wi-Fi, and both devices share a network. Use “Test /data in browser” to check.`);
+      else if(error instanceof TypeError)showConnectionHelp(location.protocol==='https:'?`The browser may be blocking the HTTP glove request from this HTTPS page. Open the simulator over HTTP. Also confirm ${ip} is the current ESP32 IP.`:`The browser could not read ${url}. Confirm ${ip} is the current IP, both devices are on the same Wi-Fi, and the ESP32 serves /data with CORS enabled.`);
+      else showConnectionHelp(`Could not read ${url}: ${error instanceof Error?error.message:error}. The ESP32 must return JSON with at least one finger reading.`);
+    }finally{clearTimeout(to);if(pollController===controller)pollController=null}
+    if(connecting&&attempt===connectionAttempt)await new Promise(r=>setTimeout(r,POLL_MS));
+  }
+  if(attempt===connectionAttempt)connecting=false};
+
+/* glove -> instrument input */
+function gloveGripValue(){
+  const b=['index','middle','ring'].map(k=>{const r=sensorValue(k);return r===null?null:normalizeSensor(k,r)}).filter(x=>x!==null);
+  const fingers=b.length?b.reduce((a,c)=>a+c)/b.length:0;const light=tasks[ti]&&tasks[ti].mode==='light';return light?Math.min(.5,Math.max(fingers*.6,gloveGrab?.3:0)):Math.max(fingers,gloveGrab?.65:0)}
+
+/* =====================================================================
+   SIMULATION: operating theatre + endoscope scene
+   ===================================================================== */
+const M=(c,r=.55,m=0,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,...o});
+const add=(p,g,m,pos,rot,sc)=>{const o=new THREE.Mesh(g,m);if(pos)o.position.set(...pos);if(rot)o.rotation.set(...rot);if(sc)o.scale.set(...sc);o.castShadow=o.receiveShadow=true;p.add(o);return o};
+const sph=(p,m,pos,sc)=>add(p,new THREE.SphereGeometry(1,28,18),m,pos,null,sc);
+const cyl=(p,m,pos,r,h,rot,r2)=>add(p,new THREE.CylinderGeometry(r,r2??r,h,20),m,pos,rot);
+const box=(p,m,pos,s)=>add(p,new THREE.BoxGeometry(...s),m,pos);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),Y=V(0,1,0),Z=V(0,0,1);
+function noiseTex(base,jit,n=700){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,256);
+  for(let i=0;i<n;i++){const r=4+Math.random()*22,a=Math.random()*.1;x.fillStyle=`rgba(${jit[0]+Math.random()*jit[3]|0},${jit[1]+Math.random()*jit[3]|0},${jit[2]+Math.random()*jit[3]|0},${a})`;x.beginPath();x.arc(Math.random()*256,Math.random()*256,r,0,7);x.fill()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t}
+
+const ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+ren.setPixelRatio(Math.min(devicePixelRatio,1.8));ren.setSize(innerWidth,innerHeight);ren.outputColorSpace=THREE.SRGBColorSpace;
+ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.05;ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;document.body.prepend(ren.domElement);
+
+/* ---------- Scene B: endoscopic view rendered to a texture ---------- */
+const sB=new THREE.Scene();sB.background=new THREE.Color(0x1a0607);
+const camB=new THREE.PerspectiveCamera(50,1.5,.1,30);camB.position.set(0,0,5.2);sB.add(camB);
+sB.add(new THREE.AmbientLight(0xffd6cc,1.1));const lampB=new THREE.PointLight(0xfff3ea,46,16,1.5);lampB.position.set(0,0,.3);camB.add(lampB);
+const rt=new THREE.WebGLRenderTarget(960,640,{samples:4});
+const wall=add(sB,new THREE.SphereGeometry(9,32,20),new THREE.MeshStandardMaterial({color:0xd9858a,roughness:.55,side:THREE.BackSide,map:noiseTex('#c9777c',[170,60,70,60])}),[0,0,-1]);
+const liverTex=noiseTex('#7a2a25',[100,30,25,50]);
+sph(sB,M(0x7a2a25,.38,0,{map:liverTex}),[.1,1.9,-.9],[3.4,1.25,1.1]);
+sph(sB,M(0x6d241f,.4,0,{map:liverTex}),[-2.6,1.2,-.9],[1.5,.9,.9]);
+sph(sB,M(0xd88f86,.5),[.6,-1.9,-.6],[2.8,.9,.8]);sph(sB,M(0xe8c06a,.6),[2.1,-.3,-.7],[.9,.6,.5]);sph(sB,M(0xe8c06a,.6),[-2.4,-1.2,-.6],[.8,.5,.5]);
+const tubeOf=(pts,r,mat)=>add(sB,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,r,12),mat);
+const N=V(-.85,.45,-.05),ductC=new THREE.CatmullRomCurve3([V(-.9,.35,.05),V(-1.15,-.1,.1),V(-1.45,-.5,.1)]);
+const ductMat=M(0xd8cf7a,.35);
+add(sB,new THREE.TubeGeometry(ductC,30,.06,12),ductMat);const ductFull=sB.children[sB.children.length-1];
+const sub=(a,b)=>new THREE.CatmullRomCurve3(Array.from({length:6},(_,i)=>ductC.getPoint(a+(b-a)*i/5)));
+const ductA=add(sB,new THREE.TubeGeometry(sub(0,.46),20,.06,12),ductMat),ductB=add(sB,new THREE.TubeGeometry(sub(.58,1),20,.06,12),ductMat);ductA.visible=ductB.visible=false;
+tubeOf([V(-2.5,.4,-.1),V(-1.7,-.5,0),V(-1.5,-.55,.1),V(-1.1,-1.6,0)],.095,M(0xc9c46a,.4));
+tubeOf([V(-1.7,-1.4,.1),V(-1.3,-.4,.25),V(-.85,.25,.2)],.028,M(0xb3221e,.35));
+const clips=[.3,.75].map(t=>{const p=ductC.getPoint(t),c=box(sB,M(0xc7d2d6,.25,.7),[p.x,p.y,p.z+.07],[.16,.05,.05]);c.rotation.z=.9;c.visible=false;return c});
+const gb=new THREE.Group();gb.position.copy(N);gb.rotation.z=-.25;sB.add(gb);
+sph(gb,M(0x5a9a62,.22,0,{transparent:true,opacity:.96}),[.62,0,0],[.62,.29,.29]);sph(gb,M(0x4a8553,.3),[.02,0,0],[.12,.1,.1]);
+const fibers=[[-.55,.66],[-.1,.66],[.35,.62],[.75,.52]].map(([x,y])=>{const f=add(sB,new THREE.CylinderGeometry(.02,.02,.3,8),M(0xf0b9ad,.6),[x,y+.12,-.05]);return f});
+const GB_REST=V(.265,.166,0);
+/* AR ring markers inside the endoscope */
+const mark=new THREE.Group();sB.add(mark);mark.visible=false;
+const markRing=add(mark,new THREE.TorusGeometry(.22,.018,10,40),new THREE.MeshBasicMaterial({color:0xffb547,fog:false}));
+const markDot=add(mark,new THREE.CircleGeometry(.05,20),new THREE.MeshBasicMaterial({color:0xffb547}));
+/* endoscope overlay */
+const ovC=document.createElement('canvas');ovC.width=720;ovC.height=480;const ovX=ovC.getContext('2d');const ovT=new THREE.CanvasTexture(ovC);ovT.colorSpace=THREE.SRGBColorSpace;
+const ov=new THREE.Mesh(new THREE.PlaneGeometry(1.42,.947),new THREE.MeshBasicMaterial({map:ovT,transparent:true,depthTest:false,toneMapped:false}));ov.position.z=-1;ov.renderOrder=20;camB.add(ov);
+
+/* instruments (endoscope side) */
+const steel=M(0xd5dcde,.28,.45);
+function mkScopeTool(kind,T){
+  const g=new THREE.Group();
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.075,.085,8,20),new THREE.MeshBasicMaterial({color:0xdce7e9,toneMapped:false}));
+  shaft.position.z=4;shaft.rotation.x=Math.PI/2;g.add(shaft);
+  cyl(g,M(0x263239,.38,.25),[0,0,.3],.092,.24,[Math.PI/2,0,0]);
+  cyl(g,M(0x35e6d0,.3,.1),[0,0,.46],.094,.035,[Math.PI/2,0,0]);
+  const tip=new THREE.MeshStandardMaterial({color:0xcfd6d8,roughness:.25,metalness:.5,emissive:0xff4a20,emissiveIntensity:0});
+  let jawA,jawB,hook;
+  if(kind==='grasper'){for(const s of[1,-1]){const j=new THREE.Group();const m=add(j,new THREE.BoxGeometry(.075,.035,.34),tip,[0,0,-.17]);for(let i=0;i<5;i++)add(j,new THREE.BoxGeometry(.078,.01,.012),M(0x6d787c),[0,s*.02,-.06-i*.06]);g.add(j);s>0?jawA=j:jawB=j}}
+  else{add(g,new THREE.CylinderGeometry(.018,.018,.34,10),tip,[0,0,-.17],[Math.PI/2,0,0]);hook=add(g,new THREE.CylinderGeometry(.018,.018,.16,10),tip,[0,.07,-.34]);}
+  sB.add(g);return{g,tip,jawA,jawB,hook,T}}
+
+/* ---------- Scene A: operating theatre ---------- */
+const sA=new THREE.Scene();sA.background=new THREE.Color(0xe7eded);sA.fog=new THREE.Fog(0xe7eded,9,18);
+const cam=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.05,40);cam.position.set(0,2.0,1.45);cam.rotation.order='YXZ';cam.rotation.set(-.09,0,0);sA.add(cam);
+sA.add(new THREE.HemisphereLight(0xffffff,0xb7c4c4,1.5));
+const sun=new THREE.DirectionalLight(0xffffff,1.5);sun.position.set(-2,5,3);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-4,right:4,top:4,bottom:-4});sA.add(sun);
+const lamp=new THREE.SpotLight(0xf4ffff,90,10,.45,.6,1.4);lamp.position.set(.5,3.1,-.2);lamp.target.position.set(0,1.1,-.45);lamp.castShadow=true;sA.add(lamp,lamp.target);
+const wallM=M(0xf2f5f4,.92,0,{side:THREE.DoubleSide});
+add(sA,new THREE.PlaneGeometry(14,14),M(0xdfe6e5,.7),[0,0,-1],[-Math.PI/2,0,0]);
+[[0,1.9,-4.5,0],[0,1.9,6,Math.PI],[-5,1.9,0,Math.PI/2],[5,1.9,0,-Math.PI/2]].forEach(w=>add(sA,new THREE.PlaneGeometry(14,3.8),wallM,[w[0],w[1],w[2]],[0,w[3],0]));
+add(sA,new THREE.PlaneGeometry(14,14),M(0xf5f8f7,.9),[0,3.8,-1],[Math.PI/2,0,0]);
+for(const x of[-3,0,3])box(sA,new THREE.MeshBasicMaterial({color:0xf8ffff}),[x,3.76,-1],[1.6,.04,.5]);
+/* table + mannequin */
+const chrome=M(0xc3ced0,.25,.6);
+box(sA,M(0xf4f7f6,.5),[0,.92,-.45],[.8,.06,2.1]);cyl(sA,chrome,[0,.45,-.45],.09,.9);box(sA,M(0x3b4b50,.5,.3),[0,.04,-.45],[1.05,.08,1.4]);
+const skin=M(0xdcc3ae,.7,0,{map:noiseTex('#dcc3ae',[180,150,130,40],300)});
+sph(sA,skin,[0,1.05,-.4],[.42,.2,.62]);sph(sA,skin,[0,1.0,-1.15],[.36,.14,.4]);sph(sA,M(0xd2b8a3,.7),[0,1.0,.4],[.32,.12,.4]);
+box(sA,M(0x2f8f8a,.85),[0,.97,.55],[.62,.05,.75]);
+const portPos=[V(-.17,1.222,-.2),V(.17,1.222,-.2),V(0,1.247,-.55)];
+const rings=portPos.map((p,i)=>{cyl(sA,M(0xe9efef,.3,.2),[p.x,p.y+.03,p.z],.022,.12);cyl(sA,M(0x253035,.4),[p.x,p.y+.095,p.z],.03,.03);
+  const a=new THREE.Mesh(new THREE.TorusGeometry(.075,.004,8,48),new THREE.MeshBasicMaterial({color:0x35e6d0,transparent:true,opacity:.9}));a.rotation.x=Math.PI/2;a.position.copy(p).y+=.012;sA.add(a);
+  const b=new THREE.Mesh(new THREE.TorusGeometry(.105,.0025,8,48),new THREE.MeshBasicMaterial({color:0x35e6d0,transparent:true,opacity:.5}));b.rotation.x=Math.PI/2;b.position.copy(p).y+=.012;sA.add(b);return{a,b}});
+/* laparoscope in the camera port */
+{const g=new THREE.Group();g.position.copy(portPos[2]);g.rotation.x=.25;sA.add(g);cyl(g,steel,[0,.3,0],.012,.7);cyl(g,M(0x222c30),[0,.7,0],.035,.14);cyl(g,M(0x222c30),[0,.76,.06],.018,.14,[Math.PI/2,0,0]);}
+/* curved monitor */
+const R=5,TH=.62,mcx=V(0,2.15,2.4);
+const bez=add(sA,new THREE.CylinderGeometry(R+.06,R+.06,2.28,48,1,true,Math.PI-TH/2-.035,TH+.07),new THREE.MeshStandardMaterial({color:0x0a1316,roughness:.4,metalness:.5,side:THREE.BackSide}),[mcx.x,mcx.y,mcx.z]);
+rt.texture.wrapS=THREE.RepeatWrapping;rt.texture.repeat.x=-1;rt.texture.offset.x=1;
+add(sA,new THREE.CylinderGeometry(R,R,2.05,48,1,true,Math.PI-TH/2,TH),new THREE.MeshBasicMaterial({map:rt.texture,side:THREE.BackSide,toneMapped:false}),[mcx.x,mcx.y,mcx.z]);
+cyl(sA,M(0x1a2428,.4,.5),[0,1.0,-2.5],.05,2.0);box(sA,M(0x1a2428),[0,.06,-2.5],[1.0,.12,.7]);
+/* side cart */
+box(sA,chrome,[1.6,.8,-1.0],[.7,.04,.5]);cyl(sA,chrome,[1.6,.4,-1.0],.03,.8);box(sA,M(0x253035),[1.6,.86,-1.0],[.4,.06,.28]);
+
+/* ---------- instruments in the room + gloved hands ---------- */
+const toolDefs=[{name:'Left grasper',kind:'grasper',port:0,T:V(-2.8,-1.5,3.6),u:-.6,v:-.6},{name:'Right hook',kind:'hook',port:1,T:V(2.8,-1.5,3.6),u:.6,v:-.6}];
+function buildInstrumentHandle(handle,kind){
+  const grip=M(0x111a1e,.38,.16),edge=M(0x3d4a50,.28,.55),accent=new THREE.MeshBasicMaterial({color:0x35e6d0});
+  cyl(handle,grip,[0,.035,0],.052,.15);
+  cyl(handle,edge,[0,.105,0],.062,.025);
+  const housing=new THREE.Mesh(new THREE.TorusGeometry(.062,.012,10,32),accent);housing.position.set(0,.105,.004);handle.add(housing);
+  const pivot=new THREE.Mesh(new THREE.SphereGeometry(.055,16,12),grip);pivot.position.set(0,-.045,0);handle.add(pivot);
+  for(const side of [-1,1]){
+    const loop=new THREE.Mesh(new THREE.TorusGeometry(.068,.013,10,28),grip);
+    loop.position.set(side*.066,-.12,0);handle.add(loop);
+    cyl(handle,edge,[side*.066,-.12,0],.013,.025,[Math.PI/2,0,0]);
+  }
+  box(handle,edge,[0,-.07,.042],[.105,.018,.018]);
+  if(kind==='grasper'){
+    const trigger=new THREE.Mesh(new THREE.TorusGeometry(.036,.009,8,20,Math.PI),edge);
+    trigger.position.set(0,-.025,.05);handle.add(trigger);
+  }else{
+    const thumb=new THREE.Mesh(new THREE.TorusGeometry(.036,.009,8,20,Math.PI),edge);
+    thumb.position.set(0,-.025,-.05);thumb.rotation.y=Math.PI;handle.add(thumb);
+  }
+}
+const inst=toolDefs.map(d=>{const s=mkScopeTool(d.kind,d.T);
+  const shaft=cyl(sA,steel,[0,0,0],.007,1);const handle=new THREE.Group();sA.add(handle);
+  buildInstrumentHandle(handle,d.kind);
+  return{...d,s,shaft,handle,u:d.u,v:d.v,grip:0,lock:0,tip:V(0,0,.3),force:0,hand:null,path:0}});
+const handParts=[];
+function makeHand(inst0){
+  const h=new THREE.Group();sA.add(h);h.scale.setScalar(1.7);
+  const glove=M(0x1d2a30,.5,.1),node=new THREE.MeshBasicMaterial({color:0x35e6d0}),dark=M(0x10191d,.4,.3);
+  sph(h,glove,[0,0,0],[.045,.018,.055]);cyl(h,glove,[0,0,.09],.033,.1,[Math.PI/2,0,0]);
+  add(h,new THREE.TorusGeometry(.036,.007,8,24),node,[0,0,.12]);box(h,dark,[0,.034,.1],[.055,.014,.045]);box(h,new THREE.MeshBasicMaterial({color:0x35e6d0}),[0,.042,.1],[.03,.002,.02]);
+  for(const x of[-.03,.03])sph(h,node,[x,.016,.01],[.006,.006,.006]);
+  const specs=[[-.034,.1,null],[-.011,.125,'index'],[.012,.135,'middle'],[.034,.115,'ring'],[.05,.09,null]];
+  for(const[x,len,key]of specs){const root=new THREE.Group();root.position.set(x,0,-.05);h.add(root);sph(root,glove,[0,0,-len*.28],[.0165,.014,len*.38]);
+    const joint=new THREE.Group();joint.position.set(0,0,-len*.55);root.add(joint);sph(joint,glove,[0,0,-len*.23],[.014,.013,len*.3]);
+    const tip=new THREE.Group();tip.position.set(0,0,-len*.48);joint.add(tip);sph(tip,glove,[0,0,-len*.15],[.012,.012,len*.22]);sph(tip,node,[0,.008,-len*.2],[.005,.005,.005]);
+    sph(root,node,[0,.012,-len*.1],[.0045,.0045,.0045]);if(key)handParts.push({key,root,joint,tip,hand:inst0})}
+  const th=new THREE.Group();th.position.set(-.05,0,-.01);th.rotation.set(-.2,.7,0);h.add(th);sph(th,glove,[0,0,-.045],[.022,.016,.06]);
+  const tj=new THREE.Group();tj.position.set(0,0,-.085);th.add(tj);sph(tj,glove,[0,0,-.035],[.017,.014,.045]);sph(tj,node,[0,.01,-.07],[.005,.005,.005]);
+  handParts.push({key:'thumb',root:th,joint:tj,tip:tj,hand:inst0});return h}
+inst.forEach(I=>{I.hand=makeHand(I)});
+
+/* ---------- procedure tasks ---------- */
+const GROUPS=['Retract the gallbladder','Expose Calot’s triangle','Clip the cystic duct','Divide the duct','Free it from the liver bed','Extract the gallbladder'];
+const DUCT=t=>{const p=ductC.getPoint(t);return V(p.x,p.y,.3)};
+const tasks=[];const T=(g,label,i,pos,mode,dwell,cue,done)=>tasks.push({g,label,i,pos,mode,dwell,cue,done,t:0});
+function buildTasks(){tasks.length=0;
+  T(0,'Grasp fundus',0,V(GB_REST.x,GB_REST.y,.3),'grip',.5,'Left grasper: steer its tip into the glowing ring on the gallbladder fundus, then squeeze and hold firmly.',()=>{inst[0].lock=.7;gbGrasp=true});
+  T(0,'Retract upward',0,V(.0,1.05,.3),'grip',.5,'Keep holding the grasper. Steer its tip upward into the next ring to lift the gallbladder toward the liver.',()=>{});
+  T(1,'Expose Calot’s triangle',1,V(-1.15,-.02,.3),'light',.8,'Right hook is active. Aim its tip at the ring in Calot’s triangle and use a light grip (partially bend fingers).',()=>{});
+  T(2,'Clip proximal',1,DUCT(.3),'grip',.5,'Aim the hook tip at the first ring on the cystic duct and squeeze firmly to place the proximal clip. Watch the force meter.',()=>{clips[0].visible=true});
+  T(2,'Clip distal',1,DUCT(.75),'grip',.5,'Move the hook tip to the second cystic-duct ring and squeeze firmly to place the distal clip.',()=>{clips[1].visible=true});
+  T(3,'Divide duct',1,DUCT(.52),'light',.8,'Point the hook tip between the two clips and use a light grip to divide the duct.',()=>{ductFull.visible=false;ductA.visible=ductB.visible=true});
+  [[-.55,.66],[-.1,.66],[.35,.62],[.75,.52]].forEach(([x,y],k)=>T(4,`Bed point ${k+1}/4`,1,V(x,y,.3), 'light',.6,`Aim the hook tip at glowing liver-bed ring ${k+1} of 4. Use a light grip until the ring completes.`,()=>{fibers[k].visible=false}));
+  T(5,'Extract',0,V(1.0,1.2,.3),'grip',.5,'Switch to the left grasper if needed. Hold firmly and carry the gallbladder to the extraction ring at the upper right.',()=>{gb.visible=false;inst[0].lock=0});
+}
+let ti=0,gbGrasp=false,t=0,elapsed=0,accSum=0,accN=0,pen=0,over=false,active=0,mouse={u:0,v:0,grip:0},finished=false,beepCtx=null;
+window.switchTool=()=>{active=1-active;$('tool').textContent=`Active: ${inst[active].name}`};
+window.restart=()=>{ti=0;gbGrasp=false;elapsed=0;accSum=accN=pen=0;finished=false;gb.visible=true;gb.scale.set(1,1,1);gb.rotation.z=-.25;fibers.forEach(f=>f.visible=true);clips.forEach(c=>c.visible=false);ductFull.visible=true;ductA.visible=ductB.visible=false;
+  inst.forEach((I,i)=>{I.u=toolDefs[i].u;I.v=toolDefs[i].v;I.lock=0;I.grip=0;I.path=0});active=0;$('tool').textContent=`Active: ${inst[0].name}`;buildTasks();ui(true)};
+function tick(){try{beepCtx=beepCtx||new AudioContext();const o=beepCtx.createOscillator(),g=beepCtx.createGain();o.frequency.value=880;g.gain.value=.05;o.connect(g).connect(beepCtx.destination);o.start();o.stop(beepCtx.currentTime+.08)}catch(e){}}
+$('steps').innerHTML=GROUPS.map(g=>`<li>${g}</li>`).join('');
+const stepEls=[...$('steps').children];
+
+/* ---------- input ---------- */
+addEventListener('pointermove',e=>{mouse.u=clamp(e.clientX/innerWidth*2-1,-1,1);mouse.v=clamp(-(e.clientY/innerHeight*2-1)*1.15,-1,1)});
+const down={l:false,r:false,shift:false};
+addEventListener('pointerdown',e=>{if(e.target.closest('button,aside,input'))return;if(!beepCtx)try{beepCtx=new AudioContext()}catch(_){}if(e.button===2)down.r=true;else down.l=true});
+addEventListener('pointerup',()=>{down.l=down.r=false});addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('keydown',e=>{if(e.code==='Tab'){e.preventDefault();switchTool()}if(e.code==='KeyR')restart();if(e.code==='KeyC')centerGlove();down.shift=e.shiftKey});
+addEventListener('keyup',e=>{down.shift=e.shiftKey});
+addEventListener('resize',()=>resize());
+
+/* ---------- per-frame ---------- */
+const anchors=[V(-.3,.3,0),V(.2,.4,0),V(-1.15,-.1,0),V(-1.4,-.4,0),V(-.55,.66,0),V(.35,.62,0),V(.75,.52,0)];
+const dir=V(0,0,0),tmpQ=new THREE.Quaternion();
+function frame(dt){
+  t+=dt;if(!finished)elapsed+=dt;moveCamera(dt);
+  const live=connected&&performance.now()-lastPacketAt<700&&gloveTilt&&gloveNeutralTilt;
+  const A=inst[active];let tu,tv,g;
+  if(live){tu=clamp((gloveTilt.roll-gloveNeutralTilt.roll)/.7,-1,1);tv=clamp(-(gloveTilt.pitch-gloveNeutralTilt.pitch)/.7,-1,1);g=gloveGripValue()}
+  else{tu=mouse.u;tv=mouse.v;const lm=tasks[ti]&&tasks[ti].mode==='light';g=(down.r||(down.l&&(down.shift||lm)))?.3:down.l?.65:0}
+  const k=Math.min(1,dt*9);
+  for(const I of inst){
+    if(I===A){const ou=I.u,ov=I.v;I.u+=(tu-I.u)*k;I.v+=(tv-I.v)*k;I.path+=Math.hypot(I.u-ou,I.v-ov)*2.2;I.grip+=(g-I.grip)*Math.min(1,dt*12)}
+    else I.grip+=(0-I.grip)*Math.min(1,dt*8);
+    const eff=Math.max(I.grip,I.lock);I.eff=eff;
+    I.tip.set(I.u*2,I.v*1.5,.3);
+    I.s.g.position.copy(I.tip);I.s.g.quaternion.setFromUnitVectors(Z,dir.copy(I.s.T).sub(I.tip).normalize());
+    const open=(1-eff)*.45+.02;if(I.s.jawA){I.s.jawA.rotation.x=open;I.s.jawB.rotation.x=-open}
+    const near=anchors.some(a=>Math.hypot(a.x-I.tip.x,a.y-I.tip.y)<.5);
+    const cautery=I.kind==='hook'&&eff>.1&&eff<.55&&near;I.s.tip.emissiveIntensity=cautery?1.6+Math.sin(t*40)*.6:0;
+    I.force=near?eff*5.8*(.94+.06*Math.sin(t*17+I.u)):eff*.5;
+    /* theatre side: fulcrum through the trocar */
+    const P=portPos[I.port];dir.set(I.u*.5,-1,-I.v*.5).normalize();
+    const H=P.clone().addScaledVector(dir,-.55),E=P.clone().addScaledVector(dir,.16);
+    I.shaft.position.copy(H).add(E).multiplyScalar(.5);I.shaft.scale.y=H.distanceTo(E);I.shaft.quaternion.setFromUnitVectors(Y,dir);
+    I.handle.position.copy(H);I.handle.quaternion.copy(I.shaft.quaternion);I.hand.position.copy(H).add(V(0,.055,.015));I.hand.rotation.set(-.35+(I===A?0:.1),0,0);
+  }
+  for(const p of handParts){const isA=inst[active]===p.hand;let b=p.hand.eff*.9;
+    if(isA&&live){const m=normalizeSensor(p.key,sensorValue(p.key));if(m!==null)b=m}
+    const kk=Math.min(1,dt*14);p.root.rotation.x+=(-b*.85-p.root.rotation.x)*kk;p.joint.rotation.x+=(-b*.95-p.joint.rotation.x)*kk;if(p.tip!==p.joint)p.tip.rotation.x+=(-b*.4-p.tip.rotation.x)*kk}
+  /* AR rings pulse */
+  rings.forEach((r,i)=>{const on=i===inst[active].port,s=1+.08*Math.sin(t*4+i);r.a.scale.setScalar(s);r.b.scale.setScalar(1.05+.1*Math.sin(t*2.2));r.b.rotation.z=t*.8;
+    r.a.material.color.set(on?0xffb547:0x35e6d0);r.b.material.color.set(on?0xffb547:0x35e6d0);r.a.material.opacity=on?1:.55;r.b.material.opacity=on?.7:.3});
+  /* gallbladder follows the grasper when held */
+  if(gbGrasp&&gb.visible){const tp=inst[0].tip,dx=tp.x-N.x,dy=tp.y-N.y;gb.rotation.z=Math.atan2(dy,dx);gb.scale.x=clamp(Math.hypot(dx,dy)/1.2,.55,1.5)}
+  /* task engine */
+  const tk=tasks[ti];let warn='';if(tk&&!finished&&tk.i!==active){active=tk.i;$('tool').textContent=`Active: ${inst[active].name}`}
+  if(tk&&!finished){const I=inst[tk.i],d=Math.hypot(I.tip.x-tk.pos.x,I.tip.y-tk.pos.y),RR=.32,e=I.eff;
+    const ok=d<RR&&(tk.mode==='grip'?e>=.5:e>.08&&e<.62);
+    if(d<RR){accSum+=1-d/RR;accN++}
+    tk.t=ok?tk.t+dt:Math.max(0,tk.t-dt*.5);
+    mark.visible=true;mark.position.copy(tk.pos);mark.position.z=.15;const c=tk.mode==='grip'?0xffb547:0x35e6d0;markRing.material.color.set(c);markDot.material.color.set(c);
+    mark.scale.setScalar(1+.12*Math.sin(t*6)-(tk.t/tk.dwell)*.35);
+    if(tk.t>=tk.dwell){tk.done();ti++;tick();if(ti>=tasks.length){finished=true;mark.visible=false;gbGrasp=false}}}
+  else mark.visible=false;
+  over=inst.some(I=>I.force>4.4);if(over){pen+=dt*6;warn='Excess force on tissue'}
+  lampB.intensity=46+(over?-12:0);
+  if(Math.floor(t*12)!==Math.floor((t-dt)*12))drawOverlay();
+  if(Math.floor(t*8)!==Math.floor((t-dt)*8))ui(false,warn);
+  /* render endoscope then room */
+  ren.setRenderTarget(rt);ren.render(sB,camB);ren.setRenderTarget(null);renderRoom()}
+/* =====================================================================
+   BACKEND (from the original simulator): view, gyro, VR box, movement
+   ===================================================================== */
+const keys={};
+let isVR=false,gyroEnabled=false,gotOrientation=false,recenterPending=false;
+const D2R=Math.PI/180,yawFix=new THREE.Quaternion(),deviceQ=new THREE.Quaternion(),tmpEuler=new THREE.Euler(),qBack=new THREE.Quaternion(-Math.SQRT1_2,0,0,Math.SQRT1_2);
+const stereo=new THREE.StereoCamera();stereo.aspect=.5;stereo.eyeSep=.064;
+const eyeRT=new THREE.WebGLRenderTarget(window.innerWidth/2,window.innerHeight);
+const distMat=new THREE.ShaderMaterial({uniforms:{t:{value:eyeRT.texture},k:{value:.25},sx:{value:0}},
+  vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
+  fragmentShader:['uniform sampler2D t;uniform float k;uniform float sx;varying vec2 v;','void main(){vec2 c=v*2.-1.;vec2 d=c*(1.+k*dot(c,c));vec2 u=d*.5+.5+vec2(sx,0.);','gl_FragColor=(u.x<0.||u.x>1.||u.y<0.||u.y>1.)?vec4(0.,0.,0.,1.):texture2D(t,u);','#include <tonemapping_fragment>','#include <colorspace_fragment>','}'].join('\n')});
+const qScene=new THREE.Scene();qScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),distMat));const qCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+function resize(){cam.aspect=innerWidth/innerHeight;cam.fov=isVR?90:58;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);updateEyeRTSize()}
+function updateEyeRTSize(){
+  if(isVR){
+    eyeRT.setSize(Math.max(2,Math.floor(innerWidth/2)),Math.max(2,innerHeight));
+  } else {
+    eyeRT.setSize(Math.max(2,Math.floor(innerWidth/2)),Math.max(2,innerHeight));
+  }
+}
+function renderRoom(){
+  if(!isVR){ren.setViewport(0,0,innerWidth,innerHeight);ren.setScissorTest(false);ren.render(sA,cam);return}
+  const w=Math.floor(innerWidth/2),h=innerHeight,pr=ren.getPixelRatio();
+  eyeRT.setSize(Math.max(2,Math.floor(w*pr)),Math.max(2,Math.floor(h*pr)));
+  cam.updateMatrixWorld();stereo.update(cam);
+  distMat.uniforms.k.value=Number($('lens').value)/100*.55;const off=(Number($('align').value)-7.5)*.012;
+  [stereo.cameraL,stereo.cameraR].forEach((c,i)=>{
+    ren.setRenderTarget(eyeRT);ren.render(sA,c);ren.setRenderTarget(null);
+    distMat.uniforms.sx.value=i?-off:off;
+    ren.setScissorTest(true);
+    ren.setViewport(i*w,0,w,h);ren.setScissor(i*w,0,w,h);ren.render(qScene,qCam)});
+  ren.setScissorTest(false)}
+function moveCamera(dt){
+  const f=Number(keys.KeyW||keys.ArrowUp)-Number(keys.KeyS||keys.ArrowDown),s2=Number(keys.KeyD||keys.ArrowRight)-Number(keys.KeyA||keys.ArrowLeft);if(!f&&!s2)return;
+  const d=new THREE.Vector3(s2,0,-f).normalize().applyAxisAngle(Y,cam.rotation.y).multiplyScalar(1.4*dt);
+  cam.position.x=clamp(cam.position.x+d.x,-3,3);cam.position.z=clamp(cam.position.z+d.z,-.5,3.5)}
+function onOrientation(event){
+  if(!gyroEnabled||event.alpha==null)return;gotOrientation=true;
+  const orientation=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*D2R;
+  tmpEuler.set((event.beta||0)*D2R,(event.alpha||0)*D2R,-(event.gamma||0)*D2R,'YXZ');
+  deviceQ.setFromEuler(tmpEuler).multiply(qBack).multiply(new THREE.Quaternion().setFromAxisAngle(Z,-orientation));
+  if(recenterPending){yawFix.setFromAxisAngle(Y,-tmpEuler.setFromQuaternion(deviceQ,'YXZ').y);recenterPending=false}
+  cam.quaternion.copy(yawFix).multiply(deviceQ)}
+window.recenter=()=>{recenterPending=true};
+window.resetPosition=()=>{cam.position.set(0,2.0,1.45);cam.rotation.set(-.09,0,0);recenterPending=true};
+window.startTraining=()=>{restart();$('ui').classList.add('closed')};
+window.releaseHeldItem=()=>{if(!gbGrasp)return;gbGrasp=false;inst[0].lock=0;gb.rotation.z=-.25;gb.scale.set(1,1,1);if(ti<3){ti=0;tasks.forEach(k=>k.t=0)}say('Tissue released. Grasp the fundus again.')};
+window.enableGyro=async()=>{
+  if(gyroEnabled)return;const O=window.DeviceOrientationEvent;
+  if(O&&typeof O.requestPermission==='function'){try{const p=await O.requestPermission();if(p!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
+  gyroEnabled=true;gotOrientation=false;recenterPending=true;$('gyroBtn').textContent='Gyro: ON';
+  setTimeout(()=>{if(!gotOrientation){gyroEnabled=false;$('gyroBtn').textContent='Enable gyro';say('No device orientation data received. Use a motion-enabled phone over HTTPS, or WASD to move.')}},1800)};
+window.toggleVRBox=async()=>{
+  isVR=!isVR;document.body.classList.toggle('vr',isVR);
+  if(isVR)updateEyeRTSize();
+  resize();
+  if(isVR&&!gyroEnabled)await window.enableGyro();
+  if(isVR){setTimeout(()=>{recenterPending=true},3000);try{await document.documentElement.requestFullscreen()}catch(e){}try{await screen.orientation.lock('landscape')}catch(e){}}
+  else{try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}try{screen.orientation.unlock()}catch(e){}}};
+addEventListener('keydown',e=>{keys[e.code]=true});addEventListener('keyup',e=>{keys[e.code]=false});addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+addEventListener('deviceorientation',onOrientation);
+document.querySelectorAll('.move-btn').forEach(b=>{const k=b.dataset.key,stop=()=>{keys[k]=false};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,stop))});
+resize();
+
+function accuracy(){return clamp((accN?accSum/accN*100:100)-pen,0,100)}
+function drawOverlay(){const c=ovX,w=720,h=480;c.clearRect(0,0,w,h);
+  const g=c.createRadialGradient(w/2,h/2,h*.32,w/2,h/2,h*.62);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,over?'rgba(60,0,0,.95)':'rgba(0,0,0,.95)');c.fillStyle=g;c.fillRect(0,0,w,h);
+  c.fillStyle='#d8fffa';c.font='600 15px sans-serif';c.fillText('LAP 30° · 1080p · CO₂ 12 mmHg',22,32);
+  c.fillStyle=Math.floor(t*1.5)%2?'#ff4d4d':'#552';c.beginPath();c.arc(w-92,27,6,0,7);c.fill();c.fillStyle='#d8fffa';c.fillText('REC',w-80,32);
+  const tk=tasks[ti];c.font='600 16px sans-serif';c.fillText(finished?'Procedure complete':`${tk?tk.label:''}`,22,h-24);
+  c.fillText(tk&&!finished?`${inst[tk.i].name} · ${tk.mode==='grip'?'firm grip':'light grip'}`:'',22,h-48);c.textAlign='right';c.fillText(`Accuracy ${accuracy()|0}%`,w-22,h-24);c.textAlign='left'}
+function ui(force,warn){
+  const tk=tasks[ti],gi=finished?GROUPS.length:tk?tk.g:0;
+  if(force||ui.g!==gi){ui.g=gi;stepEls.forEach((e,i)=>e.className=i<gi?'done':i===gi?'cur':'')}
+  $('acc').textContent=accuracy()|0;if(tk&&!finished)say(tk.cue);else if(finished)say(`Complete in ${fmt(elapsed)} with ${accuracy()|0}% accuracy. Press Restart to repeat.`);
+  inst.forEach((I,i)=>{$('f'+i).textContent=I.force.toFixed(1)+' N';const b=$('b'+i);b.style.width=clamp(I.force/6*100,0,100)+'%';b.className=I.force>4.4?'hot':''});
+  fingerKeys.forEach((k,i)=>{const r=sensorValue(k),n=r===null?0:normalizeSensor(k,r);$('v'+i).textContent=r===null?'—':`${Math.round(r)} / ${Math.round(n*100)}%`;$('s'+i).style.width=n*100+'%'});
+  $('tm').textContent=fmt(elapsed);$('pth').textContent=(inst[0].path+inst[1].path).toFixed(1)+' m';$('warn').textContent=warn||''}
+const fmt=s=>`${s/60|0}:${String(s%60|0).padStart(2,'0')}`;
+const clock=new THREE.Clock();
+restart();
+ren.setAnimationLoop(()=>frame(Math.min(clock.getDelta(),.05)));
+window.connectESP();
+addEventListener('beforeunload',()=>{if(pollController)pollController.abort()});
+</script></body></html>
