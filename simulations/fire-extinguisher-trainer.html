@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><script src="../assets/auth.js"></script><script>SimuAuth.guard()</script>
+<html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>VR Fire Extinguisher Trainer</title>
 <style>
@@ -37,7 +37,7 @@ button.p{background:linear-gradient(135deg,#ff7a2a,#e5481c);border-color:#ffb27a
 #bp{display:none;position:fixed;z-index:70;inset:0;overflow:auto;background:#06121bf7;padding:70px 18px 50px}#bp.open{display:block}
 #bp .in{max-width:860px;margin:0 auto;font-size:.88rem;line-height:1.6;user-select:text}#bp h1{font-size:1.3rem;color:var(--teal);margin:0 0 6px}#bp h2{font-size:1rem;color:var(--amber);margin:22px 0 6px;border-bottom:1px solid #ffffff22;padding-bottom:4px}
 #bp code{background:#ffffff14;padding:1px 5px;border-radius:4px}#bpx{position:fixed;z-index:75;top:12px;right:14px}#bp table{border-collapse:collapse;width:100%;font-size:.82rem}#bp td,#bp th{border:1px solid #ffffff24;padding:5px 8px;text-align:left}
-body.vr .card,body.vr #menuBtn,body.vr #L{display:none}body.vr #exitVR{display:block}@media(orientation:portrait){body.vr #rotate{display:flex}}
+body.vr .card,body.vr #menuBtn,body.vr #L,body.vr #ui,body.vr #bar,body.vr #R,body.vr #top,body.vr #bp,body.vr #vrBtn{display:none!important}body.vr #exitVR{display:block}@media(orientation:portrait){body.vr #rotate{display:flex}}
 body.nohud #top,body.nohud #R,body.nohud #bar,body.nohud #L{display:none}
 @media(max-width:700px){#L{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));width:calc(100vw - 24px)}#R{width:140px}}
 </style></head><body>
@@ -64,7 +64,7 @@ body.nohud #top,body.nohud #R,body.nohud #bar,body.nohud #L{display:none}
 <h3>Move (hold)</h3><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
 <details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0–100) per finger.</small><div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div><div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div><div class="g2"><button onclick="saveCal()">Save</button><button onclick="resetCal()">Reset</button></div></details>
 <details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Image spacing (lower = images closer together)</label><input type="range" id="align" min="0" max="30" value="10"><label for="depth">3D depth (lower = easier on the eyes)</label><input type="range" id="depth" min="0" max="70" value="35"><small>Set these BEFORE you put the phone in the box. If you see two separate images, lower Image spacing or 3D depth. If the picture looks bent at the edges, change Lens correction. Settings are saved.</small></details>
-<details><summary>Controls</summary><small>Mouse: move to aim, left click / Space = trigger (1st press pulls the pin, hold to squeeze). Right-drag or arrows look, WASD walk, E pick up, Q put back, F fire class, Tab switch hand, C centre glove, H hide HUD. Glove: finger bend = trigger, wrist tilt = aim. Headset: Enter VR button, grip to pick up.</small></details></aside>
+<details><summary>Controls</summary><small>Mouse: move to aim, left click / Space = trigger (1st press pulls the pin, hold to squeeze). Right-drag or arrows look, WASD walk, E pick up, Q put back, F fire class, Tab switch hand, C centre glove, H hide HUD. Glove: finger bend = trigger, wrist tilt = aim. Headset: Enter VR button, grip to pick up. VR Box: no walking needed. Look = aim, tap = trigger, and you are moved automatically between the power isolator, the rack and the fire.</small></details></aside>
 <button id="exitVR" onclick="toggleVRBox()" aria-label="Exit VR">✕</button><div id="rotate">Rotate your phone to landscape, then place it in the VR box.</div>
 <div id="bp"><button id="bpx" onclick="$('bp').classList.remove('open')">Close ✕</button><div class="in">
 <h1>Fire extinguisher VR trainer — blueprint</h1>
@@ -100,7 +100,7 @@ try{THREE=await loadFirst(['./three.module.js','https://cdn.jsdelivr.net/npm/thr
 catch(e){fatal(e.message);throw e}
 try{VRButton=(await loadFirst(['./VRButton.js','https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js','https://unpkg.com/three@0.160.0/examples/jsm/webxr/VRButton.js'])).VRButton}catch(e){console.warn('VRButton unavailable; desktop/mouse mode only')}
 const $=window.$=id=>document.getElementById(id),clamp=THREE.MathUtils.clamp,rnd=Math.random;
-const say=t=>{$('cue').textContent=t},V=(x,y,z)=>new THREE.Vector3(x,y,z);
+var vrText='',lookDownT=0,endT=0,lastCtl=null;const say=t=>{$('cue').textContent=t;vrText=t},V=(x,y,z)=>new THREE.Vector3(x,y,z);
 const M=(c,r=.7,m=0,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,...o});
 const add=(p,g,m,pos,rot)=>{const o=new THREE.Mesh(g,m);if(pos)o.position.set(...pos);if(rot)o.rotation.set(...rot);p.add(o);return o};
 const box=(p,m,pos,s)=>add(p,new THREE.BoxGeometry(...s),m,pos),cyl=(p,m,pos,r,h,rot,r2)=>add(p,new THREE.CylinderGeometry(r,r2??r,h,18),m,pos,rot);
@@ -141,7 +141,7 @@ function gloveHud(){FK.forEach((k,i)=>{const n=bend(k);$('fv'+i).textContent=n==
 /* ============ RENDERER / SCENE ============ */
 const ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});ren.setPixelRatio(Math.min(devicePixelRatio,1.8));ren.setSize(innerWidth,innerHeight);
 ren.outputColorSpace=THREE.SRGBColorSpace;ren.toneMapping=THREE.ACESFilmicToneMapping;ren.xr.enabled=true;document.body.prepend(ren.domElement);
-if(VRButton&&self===top){const vrb=VRButton.createButton(ren);vrb.style.bottom='64px';document.body.appendChild(vrb)}
+if(VRButton&&self===top){const vrb=VRButton.createButton(ren);vrb.id='vrBtn';vrb.style.bottom='64px';document.body.appendChild(vrb)}
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x1b2126);scene.fog=new THREE.Fog(0x1b2126,9,26);
 const rig=new THREE.Group(),cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.03,60);cam.rotation.order='YXZ';rig.add(cam);scene.add(rig);
 const START=V(-1.5,1.6,3.5);cam.position.copy(START);
@@ -204,9 +204,9 @@ addEventListener('pointerup',()=>{down=drag=false});addEventListener('contextmen
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.target.closest&&e.target.closest('input'))return;if(e.code==='Space'||e.code.startsWith('Arrow'))e.preventDefault();
   if(e.code==='KeyE')act('pick');if(e.code==='KeyQ')act('drop');if(e.code==='KeyR')restart();if(e.code==='KeyF')toggleClass();if(e.code==='KeyH')document.body.classList.toggle('nohud');if(e.code==='Tab'){e.preventDefault();switchHand()}if(e.code==='KeyC')centerGlove();if(e.code==='KeyT')hint();if(e.code==='KeyN')setLevel(level===1?2:1);
   const n={Digit1:1,Digit2:2}[e.code];if(n)setView(n)});addEventListener('keyup',e=>{keys[e.code]=false});
-const ctl=[0,1].map(i=>{const c=ren.xr.getController(i);rig.add(c);c.addEventListener('selectstart',()=>{xrTrig=true});c.addEventListener('selectend',()=>{xrTrig=false});
-  c.addEventListener('squeezestart',()=>{if(held)drop();else{let best=null,bd=.7;for(const e of exts){const d=e.g.getWorldPosition(V(0,0,0)).add(V(0,.3,0)).distanceTo(c.getWorldPosition(V(0,0,0)));if(d<bd){bd=d;best=e}}if(best)pickUp(best,c)}});return c});
-ren.xr.addEventListener('sessionstart',()=>{rig.position.set(START.x,0,START.z);cam.position.set(0,0,0);cam.rotation.set(0,0,0)});
+const ctl=[0,1].map(i=>{const c=ren.xr.getController(i);rig.add(c);c.addEventListener('connected',e=>{c.userData.hand=e.data&&e.data.handedness});c.addEventListener('selectstart',()=>{xrTrig=true;lastCtl=c;if(level===2&&!powerCut&&!held){const o=c.getWorldPosition(V(0,0,0)),dd=V(0,0,-1).applyQuaternion(c.getWorldQuaternion(new THREE.Quaternion()));if(new THREE.Raycaster(o,dd,0,8).intersectObject(isoPx,false).length)cutPower()}});c.addEventListener('selectend',()=>{xrTrig=false});
+  c.addEventListener('squeezestart',()=>{lastCtl=c;if(held)drop();else{let best=null,bd=1.1;for(const e of exts){const d=e.g.getWorldPosition(V(0,0,0)).add(V(0,.3,0)).distanceTo(c.getWorldPosition(V(0,0,0)));if(d<bd){bd=d;best=e}}if(best)pickUp(best,c)}});return c});
+ren.xr.addEventListener('sessionstart',()=>{rig.position.set(START.x,0,START.z);cam.position.set(0,0,0);cam.rotation.set(0,0,0);goStation(stationNow())});
 ren.xr.addEventListener('sessionend',()=>{rig.position.set(0,0,0);cam.position.copy(START);look.yaw=0;look.pitch=-.12});
 window.setView=n=>{const T=n===1?[-4.7,1,3.1]:[FC.x,.6,FC.z],p=cam.position,dx=T[0]-p.x,dy=T[1]-p.y,dz=T[2]-p.z;look.goal={yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz))}};
 window.act=a=>{if(a==='pick'&&!held){if(hov)pickUp(hov);else if(hovIso)cutPower()}if(a==='drop')drop()};
@@ -223,10 +223,10 @@ window.restart=()=>{state='run';powerCut=false;flareT=10;hintOn=hinted=false;FC.
   held=null;for(const c of cells){const core=Math.abs(c.i-2)<=1&&Math.abs(c.j-2)<=1;c.c=core?(fireClass==='B'?.7:fireClass==='C'?.6:.55):0;c.cool=0}bin.visible=fireClass==='A';pan.visible=fireClass==='B';cab.visible=fireClass==='C';iso.visible=level===2;isoLev.rotation.x=0;isoLed.material.color.setHex(0xff3b30);
   placard.material.map=tex(300,120,(x,w,h)=>{x.fillStyle='#f5c518';x.fillRect(0,0,w,h);x.fillStyle='#111';x.font='700 24px sans-serif';x.textAlign='center';x.fillText('⚠ FIRE',w/2,34);x.font='600 19px sans-serif';
     x.fillText(fireClass==='A'?'Waste bin: paper & cardboard':fireClass==='B'?'Diesel spill: flammable liquid':'Server cabinet: LIVE electrics',w/2,70);x.font='15px sans-serif';x.fillText('Read the sign. Choose the extinguisher.',w/2,100)});placard.material.needsUpdate=true;
-  cam.position.copy(START);look.yaw=0;look.pitch=-.12;say('A fire has started. Press 1 to look at the extinguisher rack and hover each one to inspect it, then click (or press E) to pick the right one.')};
+  cam.position.copy(START);look.yaw=0;look.pitch=-.12;if(vrMode())goStation(level===2?'iso':'rack');say('A fire has started. Press 1 to look at the extinguisher rack and hover each one to inspect it, then click (or press E) to pick the right one.')};
 function pickUp(e,ctrl){if(held)return;held=e;chosen=e.kind;e.arm=false;done[0]=(level<2||powerCut)?1:0;if(ctrl){ctrl.add(e.g);e.g.position.set(0,-.5,.03);e.g.rotation.set(0,Math.PI,0)}
-  const eff=EFF[fireClass][e.kind];typeScore=eff>=1?100:eff>0?40:0;if(eff<1)warn(eff<0?(fireClass==='C'?'DANGER: water on live electrics means electric shock. Put it back (Q).':'WRONG TYPE: water on a liquid fire spreads it. Put it back (Q) and choose another.'):(fireClass==='C'?'ABC powder works but wrecks electronics. CO₂ is the clean choice.':'Poor choice: CO₂ is weak on paper. ABC or water is better.'),3)}
-function drop(){if(!held)return;const e=held;held=null;scene.attach(e.g);e.g.position.copy(e.home);e.g.rotation.set(0,Math.PI/2,0);if(!e.pin&&state==='run'){done[0]=0;typeScore=null}}
+  const eff=EFF[fireClass][e.kind];typeScore=eff>=1?100:eff>0?40:0;if(eff<1)warn(eff<0?(fireClass==='C'?'DANGER: water on live electrics means electric shock. '+pb():'WRONG TYPE: water on a liquid fire spreads it. '+pb()+' Choose another.'):(fireClass==='C'?'ABC powder works but wrecks electronics. CO₂ is the clean choice.':'Poor choice: CO₂ is weak on paper. ABC or water is better.'),3);if(vrMode())goStation('fire')}
+function drop(){if(!held)return;const e=held;held=null;scene.attach(e.g);e.g.position.copy(e.home);e.g.rotation.set(0,Math.PI/2,0);if(!e.pin&&state==='run'){done[0]=0;typeScore=null}if(vrMode())goStation('rack')}
 
 /* ============ AUDIO ============ */
 let au=null;function initAudio(){if(au){au.c.resume();return}if(!window.AudioContext)return;try{const c=new AudioContext(),b=c.createBuffer(1,c.sampleRate*2,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=rnd()*2-1;
@@ -242,24 +242,25 @@ function frame(dt){
   if(!xr){const lk=(keys.ArrowLeft?1:0)-(keys.ArrowRight?1:0),up=(keys.ArrowUp?1:0)-(keys.ArrowDown?1:0);
     if(lk||up){look.goal=null;look.yaw+=lk*dt*1.4;look.pitch=clamp(look.pitch+up*dt*1.1,-1.2,1.2)}else if(look.goal){const k=1-Math.exp(-dt*5);look.yaw+=(look.goal.yaw-look.yaw)*k;look.pitch+=(look.goal.pitch-look.pitch)*k}
     if(!(gyroOn&&gotO))cam.rotation.set(look.pitch,look.yaw,0);const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
-    if(f||s){const d=V(s,0,-f).normalize().applyAxisAngle(V(0,1,0),gyroOn&&gotO?new THREE.Euler().setFromQuaternion(cam.quaternion,"YXZ").y:look.yaw).multiplyScalar(1.6*dt);cam.position.x=clamp(cam.position.x+d.x,-4.2,4.2);cam.position.z=clamp(cam.position.z+d.z,-4.4,5.5)}}
-  else{const ss=ren.xr.getSession();if(ss)for(const src of ss.inputSources)if(src.gamepad&&src.handedness==='left'){const a=src.gamepad.axes,x=a[2]||0,y=a[3]||0;if(Math.hypot(x,y)>.15){const q=cam.getWorldQuaternion(new THREE.Quaternion()),d=V(x,0,y).applyQuaternion(q);d.y=0;rig.position.addScaledVector(d,2*dt)}}}
+    if((f||s)&&!isVR){const d=V(s,0,-f).normalize().applyAxisAngle(V(0,1,0),gyroOn&&gotO?new THREE.Euler().setFromQuaternion(cam.quaternion,"YXZ").y:look.yaw).multiplyScalar(1.6*dt);cam.position.x=clamp(cam.position.x+d.x,-4.2,4.2);cam.position.z=clamp(cam.position.z+d.z,-4.4,5.5)}}
+  /* VR: no free walking. The trainer moves you between stations automatically. */
   cam.getWorldPosition(camW);cam.updateMatrixWorld(true);
   /* pointer: mouse or glove tilt */
-  const live=conn&&performance.now()-lastAt<1500&&tilt&&tilt0;let tu,tv;if(live){tu=clamp((tilt.roll-tilt0.roll)/.7,-1,1);tv=clamp(-(tilt.pitch-tilt0.pitch)/.7,-1,1)}else{tu=mouse.u;tv=mouse.v}
+  const live=conn&&performance.now()-lastAt<1500&&tilt&&tilt0;let tu,tv;if(live){tu=clamp((tilt.roll-tilt0.roll)/.7,-1,1);tv=clamp(-(tilt.pitch-tilt0.pitch)/.7,-1,1)}else{tu=isVR?0:mouse.u;tv=isVR?0:mouse.v}
   const kk=1-Math.exp(-(live?10:40)*dt);cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;
   rc.setFromCamera(v2.set(cur.u*(isVR?.25:1),cur.v*(isVR?.25:1)),cam);
   /* hover (inspect) */
   if(!held){const h=xr?null:rc.intersectObjects(proxies,false)[0];hov=h?h.object.userData.ext:null;for(const e of exts)e.body.emissive?.setHex(e===hov?0x444400:(hintOn&&EFF[fireClass][e.kind]>=1?(Math.sin(t*6)>0?0x16a34a:0x0a3a1f):0))}else hov=null;hovIso=!held&&!xr&&level===2&&!powerCut&&camW.distanceTo(isoP)<3.6&&rc.intersectObject(isoPx,false).length>0;isoBody.material.emissive.setHex(hovIso?0x773300:0);
   /* trigger edge */
   const tn=trigNow(),rise=tn&&!trigPrev;trigPrev=tn;
-  if(rise){initAudio();if(!held){if(hov)pickUp(hov);else if(hovIso)cutPower()}else if(!held.pin){held.pin=true;held.arm=false;done[1]=1;beep(900);say('Pin pulled. Now aim at the BASE of the fire.')}}
+  if(rise){initAudio();if(state!=='run'){if(vrMode()&&t-endT>1.5){if(state==='out')setLevel(level===1?2:1);else restart()}}else if(!held){if(hov)pickUp(hov);else if(hovIso)cutPower()}else if(!held.pin){held.pin=true;held.arm=false;done[1]=1;beep(900);say('Pin pulled. Now aim at the BASE of the fire.')}}
   if(!tn&&held)held.arm=true;
+  if(isVR&&!xr&&held&&!held.pin){lookDownT=V(0,0,-1).applyQuaternion(cam.quaternion).y<-.85?lookDownT+dt:0;if(lookDownT>1.2){lookDownT=0;drop();beep(420,.1);say('Put back. Look at an extinguisher and tap to pick one up.')}}else lookDownT=0;
   /* held extinguisher pose + nozzle ray */
   hasP=false;aimBase=false;discharging=false;range=0;aimRing.visible=false;
   if(held){const e=held,g=e.g;
     if(!xr){dirV.copy(rc.ray.direction);{const fy=-camW.y/dirV.y;if(dirV.y<-.01&&fy<14)tgt.copy(camW).addScaledVector(dirV,fy);else tgt.copy(camW).addScaledVector(dirV,6)}const r=V(1,0,0).applyQuaternion(cam.quaternion),u=V(0,1,0);
-      g.position.copy(camW).addScaledVector(r,.26).addScaledVector(u,-.34).addScaledVector(V(0,0,-1).applyQuaternion(cam.quaternion),.55);g.lookAt(tgt)}
+      const ho=isVR?[.18,-.3,.6]:[.26,-.34,.55];g.position.copy(camW).addScaledVector(r,ho[0]).addScaledVector(u,ho[1]).addScaledVector(V(0,0,-1).applyQuaternion(cam.quaternion),ho[2]);g.lookAt(tgt)}
     g.updateMatrixWorld(true);org.copy(NOZ);g.localToWorld(org);
     if(xr)aimD.set(0,0,-1).applyQuaternion(g.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(-1).multiplyScalar(-1);else aimD.copy(tgt).sub(org).normalize();
     if(xr){const q=g.getWorldQuaternion(new THREE.Quaternion());aimD.set(0,0,1).applyQuaternion(q)}
@@ -271,11 +272,12 @@ function frame(dt){
     if(discharging){e.charge=Math.max(0,e.charge-dt*(level===2?(e.kind==='co2'?.16:.11):.08));for(let k=0;k<5;k++){const sp=.33,sv=7.5+rnd()*2;spawn(agent,org.x,org.y,org.z,aimD.x*sv+(rnd()-.5)*sp*sv*.25,aimD.y*sv+(rnd()-.5)*sp*sv*.25+.4,aimD.z*sv+(rnd()-.5)*sp*sv*.25,.9)}}
     agent.pts.material.color.setHex(e.kind==='water'?0x8fc7ff:e.kind==='co2'?0xf2fbff:0xf4f4f4);agent.pts.material.size=e.kind==='water'?.07:.13}
     /* glove hand: curls with real finger sensors (or the trigger in mouse mode) and grips the lever when an extinguisher is held */
-  {const gs=live?gloveGrip():(tn?1:0);grip+=(gs-grip)*Math.min(1,dt*16);hand.visible=!xr;
-   if(!xr){const k=1-Math.exp(-dt*20),dv=rc.ray.direction;
+  {const gs=live?gloveGrip():(tn?1:0);grip+=(gs-grip)*Math.min(1,dt*16);hand.visible=true;const hs=HS*(isVR?1.3:1);hand.scale.set(hs*side,hs,hs);
+   if(xr){const c=lastCtl||ctl.find(x=>x.userData.hand==='right')||ctl[0];hand.visible=c.visible!==false;c.getWorldPosition(hand.position);c.getWorldQuaternion(hand.quaternion)}
+   else{const k=1-Math.exp(-dt*20),dv=rc.ray.direction;
     if(held){hand.position.lerp(held.g.localToWorld(V(0,.7,-.01)),k);hand.quaternion.slerp(held.g.getWorldQuaternion(tq).multiply(qY),k)}
-    else{const rt=V(1,0,0).applyQuaternion(cam.quaternion),up=V(0,1,0).applyQuaternion(cam.quaternion);
-     hand.position.lerp(hovIso?isoP:hov?hov.g.localToWorld(V(0,.74,0)):tmp.copy(camW).addScaledVector(dv,.55).addScaledVector(rt,.2*side).addScaledVector(up,-.22),k);hand.lookAt(hand.position.clone().sub(dv))}}
+    else{const rt=V(1,0,0).applyQuaternion(cam.quaternion),up=V(0,1,0).applyQuaternion(cam.quaternion),fw=V(0,0,-1).applyQuaternion(cam.quaternion),idle=isVR?tmp.copy(camW).addScaledVector(fw,.5).addScaledVector(rt,.1*side).addScaledVector(up,-.14):tmp.copy(camW).addScaledVector(dv,.55).addScaledVector(rt,.2*side).addScaledVector(up,-.22),lv=isVR&&!hov&&!hovIso?fw:dv;
+     hand.position.lerp(hovIso?isoP:hov?hov.g.localToWorld(V(0,.74,0)):idle,k);hand.lookAt(hand.position.clone().sub(lv))}}
    const fk=Math.min(1,dt*14);for(const p of handParts){let b;if(live){const m=bend(p.key);b=m===null?0:m}else{const q=held?.5+.5*grip:grip;b=({thumb:.3+q*.4,index:q*.7,middle:.7+q*.25,ring:.75+q*.2})[p.key]}
     p.root.rotation.x+=(-b*.85-p.root.rotation.x)*fk;p.joint.rotation.x+=(-b*.95-p.joint.rotation.x)*fk;if(p.tip!==p.joint)p.tip.rotation.x+=(-b*.4-p.tip.rotation.x)*fk}}
   /* fire + scoring */
@@ -300,14 +302,14 @@ function frame(dt){
   if(hh>.02&&rnd()<hh*dt*60)spawn(smoke,FC.x+(rnd()-.5)*1.1,.7,FC.z+(rnd()-.5)*1.1,(rnd()-.5)*.2,.5+rnd()*.5,(rnd()-.5)*.2,3.5);
   smoke.pts.material.color.setHex(fireClass==='B'?0x151515:0x4a4a4a);stepPool(agent,dt,9);stepPool(smoke,dt,0);
   if(au){au.hiss.gain.setTargetAtTime(discharging?.12:0,au.c.currentTime,.05);au.fire.gain.setTargetAtTime(hh*.18,au.c.currentTime,.2)}
-  warnT=Math.max(0,warnT-dt);uiT+=dt;if(uiT>.1){uiT=0;ui();gloveHud()}}
+  warnT=Math.max(0,warnT-dt);uiT+=dt;if(uiT>.1){uiT=0;ui();gloveHud();vrHudUpdate()}}
 function bestScore(){let b=total;try{const k='fx_best'+level;b=Math.max(total,+localStorage.getItem(k)||0);localStorage.setItem(k,b)}catch(e){}return b+'.'}
 function scores(){const aim=dT>.3?baseT/dT*100:0,sw=Math.min(100,sweeps/3*100),time=clamp(100-(tm-20)*(100/70),0,100),pen=Math.min(40,burnT*10+(level===2&&!powerCut?15:0));return{type:hinted?Math.min(typeScore??0,60):(typeScore??0),aim,sw,time,pen}}
-function finish(ok,msg){const s=scores();total=ok?Math.round(clamp(.25*s.type+.3*s.aim+.2*s.sw+.25*s.time-s.pen,0,100)):0;beep(ok?1200:300,.4);
-  say(ok?`Fire out in ${tm.toFixed(1)} s. Score ${total}/100: type ${s.type|0}, aim ${s.aim|0}%, sweep ${s.sw|0}%, time ${s.time|0}%${s.pen?`, burn −${s.pen|0}`:''}. ${level===1?'Press N for Level 2 (electrical fire).':'Level 2 cleared! Press N for Level 1.'} Best: ${bestScore()} Press R to replay.`:msg+' Press R to retry.')}
+function finish(ok,msg){const s=scores();total=ok?Math.round(clamp(.25*s.type+.3*s.aim+.2*s.sw+.25*s.time-s.pen,0,100)):0;beep(ok?1200:300,.4);endT=t;const vq=vrMode();
+  say(ok?`Fire out in ${tm.toFixed(1)} s. Score ${total}/100: type ${s.type|0}, aim ${s.aim|0}%, sweep ${s.sw|0}%, time ${s.time|0}%${s.pen?`, burn −${s.pen|0}`:''}. ${vq?(level===1?'Tap for Level 2.':'Level 2 cleared! Tap to play Level 1.'):(level===1?'Press N for Level 2 (electrical fire).':'Level 2 cleared! Press N for Level 1.')} Best: ${bestScore()} ${vq?'':'Press R to replay.'}`:msg+(vq?' Tap to retry.':' Press R to retry.'))}
 function ui(){let g=done.findIndex(d=>!d);if(g<0)g=6;stepEls.forEach((e,i)=>e.className=i<g?'done':i===g?'cur':'');
-  if(state==='run'){const cues=[hintOn&&!(level===2&&!powerCut)&&!held?hintMsg():level===2&&!powerCut?'LIVE ELECTRICS: walk to the red POWER ISOLATOR on the right-hand wall (within 3 m), point at it and click or press E to cut the power. Then pick the CO₂ cylinder (the green-glowing one if you use the hint).':hov?KINDS[hov.kind].info:'Match the extinguisher to the fire on the placard. Hover each one to inspect it, then click (or E) to pick it up.',
-    'Click (or Space / trigger) once to pull the pin.','Walk to 2–3 m (W/S) and aim the nozzle at the BASE of the fire.','Hold the trigger: squeeze the handle to discharge.','Sweep the stream side to side across the whole base until the fire is out.',''];say(cues[Math.min(g,5)])}
+  if(state==='run'){const vr=vrMode(),cues=[hintOn&&!(level===2&&!powerCut)&&!held?hintMsg():level===2&&!powerCut?vr?'LIVE ELECTRICS: turn right, look at the red POWER ISOLATOR on the wall, then tap (or pull the trigger) to cut the power.':'LIVE ELECTRICS: walk to the red POWER ISOLATOR on the right-hand wall (within 3 m), point at it and click or press E to cut the power. Then pick the CO₂ cylinder (the green-glowing one if you use the hint).':hov?KINDS[hov.kind].info:vr?`FIRE: ${FD[fireClass]}. Choose the right extinguisher: ${ren.xr.isPresenting?'reach one and squeeze the GRIP button':'look at one to inspect it, then tap to pick it up'}.`:'Match the extinguisher to the fire on the placard. Hover each one to inspect it, then click (or E) to pick it up.',
+    vr?(ren.xr.isPresenting?'Pull the trigger once to pull the pin. Squeeze GRIP to put it back.':'Tap once to pull the pin. Look straight down for 1 s to put it back.'):'Click (or Space / trigger) once to pull the pin.',vr?'You are now 2–3 m from the fire. Aim the nozzle at the BASE of the flames.':'Walk to 2–3 m (W/S) and aim the nozzle at the BASE of the fire.',vr?'Touch and hold the screen (or hold the trigger) to squeeze the handle.':'Hold the trigger: squeeze the handle to discharge.','Sweep the stream side to side across the whole base until the fire is out.',''];say(cues[Math.min(g,5)])}
   const hh=heat();$('v0').textContent=(hh*100|0)+'%';$('b0').style.width=hh*100+'%';const ch=held?held.charge:1;$('v1').textContent=(ch*100|0)+'%';$('b1').style.width=ch*100+'%';
   $('v2').textContent=Math.hypot(camW.x-FC.x,camW.z-FC.z).toFixed(1)+' m';const s=scores();$('s0').textContent=typeScore===null?'—':s.type+'%';$('s1').textContent=dT>.3?(s.aim|0)+'%':'—';$('s2').textContent=sweeps+' passes';$('s3').textContent=tm.toFixed(1)+' s';
   $('tot').textContent=state==='out'||state==='fail'?total:'—';$('warn').textContent=warnT>0?warnMsg:'';
@@ -316,13 +318,28 @@ function ui(){let g=done.findIndex(d=>!d);if(g<0)g=6;stepEls.forEach((e,i)=>e.cl
 const sph=(p,m,pos,s)=>{const o=add(p,new THREE.SphereGeometry(1,16,12),m,pos);o.scale.set(...s);return o};
 const aimRing=new THREE.Mesh(new THREE.RingGeometry(.12,.17,28),new THREE.MeshBasicMaterial({color:0xffc247,transparent:true,opacity:.85,depthWrite:false}));aimRing.rotation.x=-Math.PI/2;aimRing.visible=false;scene.add(aimRing);
 const hand=new THREE.Group(),HS=.8,handParts=[],qY=new THREE.Quaternion().setFromAxisAngle(V(0,1,0),Math.PI),tq=new THREE.Quaternion();let side=1,grip=0;hand.scale.setScalar(HS);scene.add(hand);
-{const gl=M(0x232b31,.5,.1),nd=new THREE.MeshBasicMaterial({color:0xff7a2a}),dk=M(0x111a1e,.4,.3),h=hand;
+{const gl=M(0x2c3640,.5,.1,{emissive:0x14202a}),nd=new THREE.MeshBasicMaterial({color:0xff7a2a}),dk=M(0x111a1e,.4,.3),h=hand;
  sph(h,gl,[0,0,0],[.045,.018,.055]);cyl(h,gl,[0,0,.09],.033,.1,[Math.PI/2,0,0]);add(h,new THREE.TorusGeometry(.036,.007,8,24),nd,[0,0,.12]);box(h,dk,[0,.034,.1],[.055,.014,.045]);for(const x of[-.03,.03])sph(h,nd,[x,.016,.01],[.006,.006,.006]);
  for(const[x,len,key]of[[-.034,.1,null],[-.011,.125,'index'],[.012,.135,'middle'],[.034,.115,'ring'],[.05,.09,null]]){const root=new THREE.Group();root.position.set(x,0,-.05);h.add(root);sph(root,gl,[0,0,-len*.28],[.0165,.014,len*.38]);
   const j=new THREE.Group();j.position.set(0,0,-len*.55);root.add(j);sph(j,gl,[0,0,-len*.23],[.014,.013,len*.3]);const tip=new THREE.Group();tip.position.set(0,0,-len*.48);j.add(tip);sph(tip,gl,[0,0,-len*.15],[.012,.012,len*.22]);sph(tip,nd,[0,.008,-len*.2],[.005,.005,.005]);if(key)handParts.push({key,root,joint:j,tip})}
  const th=new THREE.Group();th.position.set(-.05,0,-.01);th.rotation.set(-.2,.7,0);h.add(th);sph(th,gl,[0,0,-.045],[.022,.016,.06]);const tj=new THREE.Group();tj.position.set(0,0,-.085);th.add(tj);sph(tj,gl,[0,0,-.035],[.017,.014,.045]);sph(tj,nd,[0,.01,-.07],[.005,.005,.005]);handParts.push({key:'thumb',root:th,joint:tj,tip:tj})}
 window.switchHand=()=>{side=-side;hand.scale.x=HS*side;say(side>0?'Right hand selected.':'Left hand selected.')};
 window.toggleMenu=()=>$('ui').classList.toggle('closed');
+/* ============ VR: automatic stations (no walking) + in-world HUD ============ */
+const vrMode=()=>isVR||ren.xr.isPresenting;
+const FD={A:'paper & cardboard (Class A)',B:'flammable liquid / diesel (Class B, never water)',C:'LIVE electrics (Class C, cut the power first)'};
+const pb=()=>ren.xr.isPresenting?'Squeeze GRIP to put it back.':isVR?'Look straight down to put it back.':'Put it back (Q).';
+const stPos=n=>n==='rack'?V(-3.9,1.6,3.1):n==='iso'?V(2.4,1.6,2):V(FC.x-.48*2.6,1.6,FC.z+.88*2.6);
+const stationNow=()=>held?'fire':(level===2&&!powerCut)?'iso':'rack';
+window.goStation=n=>{if(!vrMode())return;const p=stPos(n);if(ren.xr.isPresenting)rig.position.set(p.x,0,p.z);else cam.position.set(p.x,p.y,p.z);beep(520,.06)};
+const hudC=document.createElement('canvas');hudC.width=1024;hudC.height=320;const hudX=hudC.getContext('2d'),hudT=new THREE.CanvasTexture(hudC);hudT.colorSpace=THREE.SRGBColorSpace;
+const vrHud=new THREE.Mesh(new THREE.PlaneGeometry(1,.3125),new THREE.MeshBasicMaterial({map:hudT,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));vrHud.position.set(0,.3,-1.2);vrHud.renderOrder=1000;vrHud.visible=false;cam.add(vrHud);let hudLast=null;
+function wrapTxt(txt,c,mw){const out=[];let cur='';for(const w of txt.split(' ')){const q=cur?cur+' '+w:w;if(c.measureText(q).width>mw&&cur){out.push(cur);cur=w}else cur=q}if(cur)out.push(cur);return out}
+function vrHudUpdate(){const on=vrMode();vrHud.visible=on;if(!on)return;const wr=warnT>0&&!!warnMsg,txt=wr?'⚠ '+warnMsg:vrText;if(txt===hudLast)return;hudLast=txt;
+ const c=hudX,W=1024,H=320;c.clearRect(0,0,W,H);c.fillStyle='rgba(18,12,8,.85)';c.beginPath();if(c.roundRect)c.roundRect(2,2,W-4,H-4,36);else c.rect(2,2,W-4,H-4);c.fill();c.strokeStyle='#ff7a2a';c.lineWidth=4;c.stroke();
+ c.fillStyle=wr?'#ffb4a8':'#f6efe8';c.textAlign='center';c.textBaseline='middle';let size=44,lines=[];for(;size>=22;size-=4){c.font=`600 ${size}px system-ui,sans-serif`;lines=wrapTxt(txt,c,W-70);if(lines.length*size*1.25<=H-40)break}
+ const lh=size*1.25,y0=H/2-(lines.length-1)*lh/2;lines.forEach((l,i)=>c.fillText(l,W/2,y0+i*lh));hudT.needsUpdate=true}
+
 /* ============ VIEW MODES: gyro + VR Box (split-screen phone headset) ============ */
 let isVR=false,gyroOn=false,gotO=false,fixP=false;const D=Math.PI/180,yawFix=new THREE.Quaternion(),devQ=new THREE.Quaternion(),eul=new THREE.Euler(),qBack=new THREE.Quaternion(-Math.SQRT1_2,0,0,Math.SQRT1_2),stereo=new THREE.StereoCamera(),eyeRT=new THREE.WebGLRenderTarget(512,512);stereo.aspect=.5;stereo.eyeSep=.064;
 const distMat=new THREE.ShaderMaterial({uniforms:{t:{value:eyeRT.texture},k:{value:.25},sx:{value:0}},vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
@@ -342,7 +359,7 @@ window.startTraining=()=>{restart();$('ui').classList.add('closed')};
 window.enableGyro=async()=>{if(gyroOn)return;const O=window.DeviceOrientationEvent;
  if(O&&typeof O.requestPermission==='function'){try{if(await O.requestPermission()!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
  gyroOn=true;gotO=false;fixP=true;$('gyroBtn').textContent='Gyro: ON';setTimeout(()=>{if(!gotO){gyroOn=false;$('gyroBtn').textContent='Enable gyro';say('No motion data. Use a phone over HTTPS, or arrows / WASD.')}},1800)};
-window.toggleVRBox=async()=>{isVR=!isVR;document.body.classList.toggle('vr',isVR);rsz();if(isVR&&!gyroOn)await enableGyro();
+window.toggleVRBox=async()=>{isVR=!isVR;document.body.classList.toggle('vr',isVR);$('ui').classList.add('closed');$('bp').classList.remove('open');if(isVR)goStation(stationNow());rsz();if(isVR&&!gyroOn)await enableGyro();
  if(isVR){setTimeout(()=>{fixP=true},3000);try{await document.documentElement.requestFullscreen()}catch(e){}try{await screen.orientation.lock('landscape')}catch(e){}}
  else{try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}try{screen.orientation.unlock()}catch(e){}}};
 const setView0=window.setView;window.setView=n=>{if(gyroOn&&gotO){cam.position.set(...(n===1?[-3.4,1.6,3.1]:[-1.5,1.6,3.5]));say(n===1?'Moved to the rack: look around to inspect the cylinders.':'Moved back: look at the fire.')}else setView0(n)};
@@ -356,7 +373,7 @@ add(iso,new THREE.PlaneGeometry(.36,.18),new THREE.MeshBasicMaterial({map:tex(18
 const isoLev=new THREE.Group();isoLev.position.set(0,-.1,.06);iso.add(isoLev);box(isoLev,M(0x111111),[0,.06,.02],[.04,.16,.04]);const isoLed=sph(iso,new THREE.MeshBasicMaterial({color:0xff3b30}),[0,-.22,.06],[.02,.02,.02]);
 const isoPx=new THREE.Mesh(new THREE.BoxGeometry(.3,.7,.55),new THREE.MeshBasicMaterial({visible:false}));isoPx.position.set(4.78,1.4,2);scene.add(isoPx);const isoP=V(4.5,1.3,2);
 const alarm=new THREE.PointLight(0xff2a2a,0,12,1.5);alarm.position.set(0,3.2,-1.5);scene.add(alarm);
-function cutPower(){if(level!==2||powerCut)return;powerCut=true;beep(500,.15);isoLev.rotation.x=.9;isoLed.material.color.setHex(0x4ade80);say('Power isolated. Now fight the fire with the CO₂ cylinder.');if(held)done[0]=1}
+function cutPower(){if(level!==2||powerCut)return;powerCut=true;beep(500,.15);isoLev.rotation.x=.9;isoLed.material.color.setHex(0x4ade80);say('Power isolated. Now fight the fire with the CO₂ cylinder.');if(held)done[0]=1;if(vrMode())goStation('rack')}
 addEventListener('resize',rsz);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
 restart();const clock=new THREE.Clock();
