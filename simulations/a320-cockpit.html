@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><script src="../assets/auth.js"></script><script>SimuAuth.guard()</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>A320 VR Cockpit Trainer</title>
+<style>
+:root{color-scheme:dark;--ink:#e9f4f5;--dim:#8aa9b1;--teal:#35e6d0;--amber:#ffb547;--red:#ff5d4d;--glass:#0b161bb0;font-family:"Segoe UI",system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#9fc3d8;color:var(--ink);user-select:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block;touch-action:none}
+.panel{position:fixed;z-index:5;top:calc(64px + env(safe-area-inset-top));width:min(236px,30vw);padding:12px 14px;background:var(--glass);border:1px solid #35e6d033;border-radius:12px;backdrop-filter:blur(10px);font-size:.76rem}
+#L{left:12px}#R{right:12px}
+.panel h2{margin:0 0 8px;font-size:.78rem;font-weight:650;color:var(--teal);letter-spacing:.02em}
+#steps{margin:0;padding:0;list-style:none;color:var(--dim)}#steps li{padding:3px 0 3px 17px;position:relative;line-height:1.3}
+#steps li:before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;border-radius:50%;border:1px solid var(--dim)}
+#steps li.done{color:var(--teal)}#steps li.done:before{background:var(--teal);border-color:var(--teal)}
+#steps li.cur{color:var(--ink);font-weight:600}#steps li.cur:before{background:var(--amber);border-color:var(--amber)}
+.big{display:flex;align-items:baseline;gap:6px;margin:10px 0 4px;font-variant-numeric:tabular-nums}.big span{font-size:2.3rem;font-weight:300;line-height:1}.big small{color:var(--dim)}
+#cue{margin:6px 0 0;padding-top:8px;border-top:1px solid #ffffff18;line-height:1.4;min-height:4.8em}
+.m{margin:7px 0}.m div.t{display:flex;justify-content:space-between;color:var(--dim);margin-bottom:3px;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:#ffffff14;overflow:hidden;position:relative}.bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .08s}
+.bar i.hot{background:var(--red)}.bar:after{content:"";position:absolute;left:80%;top:0;bottom:0;width:1px;background:#ffffff66}
+.bar.f:after{display:none}
+#warn{min-height:2.4em;color:var(--red);font-weight:600;margin-top:6px;line-height:1.25}
+#top{position:fixed;z-index:5;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:8px 16px;background:var(--glass);border:1px solid #35e6d033;border-radius:99px;font-size:.8rem;white-space:nowrap;max-width:calc(100vw - 80px);overflow:hidden;text-overflow:ellipsis}
+#top b{font-weight:650}#tool{color:var(--amber);margin-left:10px}
+#bar{position:fixed;z-index:5;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:calc(100vw - 24px)}
+button{font:inherit;font-size:.78rem;font-weight:600;color:var(--ink);background:#14262dea;border:1px solid #35e6d044;border-radius:9px;padding:10px 14px;min-height:44px;cursor:pointer}
+button:active{background:#1d3a44}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.p{background:#0f8f80}
+#menuBtn{position:fixed;z-index:9;top:calc(12px + env(safe-area-inset-top));left:12px;width:44px;padding:0}
+#ui{position:fixed;z-index:8;top:calc(64px + env(safe-area-inset-top));left:12px;width:min(270px,calc(100vw - 24px));max-height:calc(100vh - 150px);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:7px;background:#0b161bf2;border:1px solid #35e6d033;border-radius:12px;font-size:.74rem}
+#ui.closed{display:none}#ui label,#ui summary{color:var(--dim);font-weight:600}
+#ui input{width:100%;padding:9px;font-size:16px;background:#071014;color:var(--ink);border:1px solid #3d5863;border-radius:7px}
+#ui small{color:var(--dim);line-height:1.4}#ui .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}#ui .w{grid-column:1/-1}
+#ui .cal{display:grid;grid-template-columns:1fr 1.3fr;gap:5px;align-items:center;margin:4px 0}#ui .cal input{padding:5px;font-size:12px}
+#help{margin:0;padding:7px;border:1px solid #ffb54777;border-radius:8px;background:#5a380f55;color:#ffe2a8;line-height:1.4}
+#dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px}#dot.on{background:#3ddc7a;box-shadow:0 0 8px #3ddc7a}
+#ui .mg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}#ui .mg button{min-height:40px;touch-action:none;padding:6px}
+#ui .mg button:nth-child(1){grid-column:2}#ui .mg button:nth-child(2){grid-column:1;grid-row:2}#ui .mg button:nth-child(3){grid-column:2;grid-row:2}#ui .mg button:nth-child(4){grid-column:3;grid-row:2}
+#ui input[type=range]{padding:0;accent-color:#35e6d0}
+#exitVR{display:none;position:fixed;z-index:50;bottom:12px;left:50%;width:44px;height:44px;transform:translateX(-50%);border-radius:50%;padding:0}
+#rotate{display:none;position:fixed;z-index:60;inset:0;align-items:center;justify-content:center;padding:30px;background:#07131a;text-align:center;font-size:1rem}
+#bp{display:none;position:fixed;z-index:70;inset:0;overflow:auto;background:#06121bf7;padding:70px 18px 50px;touch-action:pan-y}
+#bp.open{display:block}#bp .in{max-width:880px;margin:0 auto;font-size:.88rem;line-height:1.6;user-select:text}
+#bp h1{font-size:1.3rem;margin:0 0 4px;color:var(--teal)}#bp h2{font-size:1.02rem;margin:26px 0 8px;color:var(--amber);border-bottom:1px solid #ffffff22;padding-bottom:5px}
+#bp h3{font-size:.9rem;margin:14px 0 4px;color:var(--teal)}#bp ul,#bp ol{margin:4px 0 8px;padding-left:22px}#bp li{margin:3px 0}#bp code{background:#ffffff14;padding:1px 5px;border-radius:4px;font-size:.82rem}
+#bp table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.82rem}#bp td,#bp th{border:1px solid #ffffff24;padding:6px 8px;text-align:left;vertical-align:top}#bp th{color:var(--teal)}
+#bpx{position:fixed;z-index:75;top:calc(12px + env(safe-area-inset-top));right:14px}
+body.vr .panel,body.vr #top,body.vr #bar,body.vr #ui,body.vr #menuBtn{display:none}body.vr #exitVR{display:block}
+@media(orientation:portrait){body.vr #rotate{display:flex}}
+@media(max-width:820px){.panel{width:150px;font-size:.68rem;padding:9px}#L .big span{font-size:1.6rem}#cue{font-size:.64rem;min-height:0}}
+.panel{opacity:.85;transition:opacity .2s}.panel:hover{opacity:1}#bar button{background:#0e1d23a8;backdrop-filter:blur(6px);min-height:38px;padding:7px 11px;font-size:.72rem}body.nohud .panel,body.nohud #bar,body.nohud #top{display:none}
+</style></head><body>
+<div id="top"><b>Airbus A320 VR cockpit · hands only · H hides HUD</b><span id="tool"></span></div>
+<button id="menuBtn" onclick="toggleMenu()" aria-label="Glove connection and calibration">⚙</button>
+<aside id="L" class="panel" aria-label="Procedure"><h2>Cold &amp; dark → takeoff</h2><ol id="steps"></ol>
+<div class="big"><span id="acc">100</span><small>% accuracy</small></div><p id="cue"></p></aside>
+<aside id="R" class="panel" aria-label="Telemetry"><h2>Glove telemetry</h2>
+<div class="m"><div class="t"><span>Grip pressure</span><span id="f0">0.0 N</span></div><div class="bar f"><i id="b0"></i></div></div>
+<div class="m"><div class="t"><span>Control load</span><span id="f1">0.0 N</span></div><div class="bar f"><i id="b1"></i></div></div>
+<div class="m"><div class="t"><span>Thumb</span><span id="v0">—</span></div><div class="bar f"><i id="s0"></i></div></div>
+<div class="m"><div class="t"><span>Index</span><span id="v1">—</span></div><div class="bar f"><i id="s1"></i></div></div>
+<div class="m"><div class="t"><span>Middle</span><span id="v2">—</span></div><div class="bar f"><i id="s2"></i></div></div>
+<div class="m"><div class="t"><span>Ring</span><span id="v3">—</span></div><div class="bar f"><i id="s3"></i></div></div>
+<div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Time</span><span id="tm">0:00</span></div>
+<div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Hand travel</span><span id="pth">0.0 m</span></div>
+<div id="warn"></div><div id="conn" style="margin-top:6px;color:var(--dim)"><span id="dot"></span><span id="ct">Glove: not connected (mouse mode)</span></div></aside>
+<div id="bar"><button class="p" onclick="switchHand()">Switch hand (Tab)</button><button onclick="setView(1)">Panel (1)</button><button onclick="setView(2)">Overhead (2)</button><button onclick="setView(3)">Pedestal (3)</button><button onclick="setView(4)">Window (4)</button><button onclick="setView(5)">Runway (5)</button><button onclick="setView(6)">Sidestick (6)</button><button onclick="centerGlove()">Center glove</button><button onclick="restart()">Restart</button><button onclick="toggleBP()">Blueprint</button></div>
+<aside id="ui" class="closed" aria-label="Glove connection">
+<label for="ip">ESP32 glove address</label><input id="ip" value="10.82.107.166" inputmode="decimal" autocomplete="off">
+<small>Use the IP printed in the ESP32 Serial Monitor. It can change when the glove reconnects to Wi-Fi.</small>
+<div class="g2"><button class="p w" onclick="connectESP()">Connect glove</button><button class="w" onclick="openGloveData()">Test /data in browser</button><button class="w" onclick="disconnectESP()">Disconnect glove</button></div>
+<p id="help" role="status" hidden></p>
+<div class="g2"><button onclick="startTraining()">Start training</button><button onclick="restart()">Restart</button><button onclick="recenter()">Recenter view</button><button onclick="resetPosition()">Reset position</button>
+<button class="w" onclick="releaseHeldItem()">Release held control</button><button id="gyroBtn" onclick="enableGyro()">Enable gyro</button><button class="p" onclick="toggleVRBox()">VR Box</button></div>
+<label>Move around (hold)</label><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
+<details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0 to 100) per finger.</small>
+<div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
+<div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
+<div class="g2"><button onclick="saveCalibration()">Save</button><button onclick="resetCalibration()">Reset</button></div></details>
+<details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
+<small><b>Mouse mode:</b> move the cursor to point the hand at a control, hold it briefly, then click (or hold left button / Space) to grab. Click = push / toggle / step knob; drag sideways turns knobs and the window; drag up/down moves throttles and flaps. Arrow keys look around, WASD moves, keys 1–4 jump to panels, Tab swaps hand.</small>
+</aside>
+<button id="exitVR" onclick="toggleVRBox()" aria-label="Exit VR">✕</button>
+<div id="rotate">Rotate your phone to landscape, then place it in the VR box.</div>
+
+<div id="bp"><button id="bpx" onclick="toggleBP()">Close ✕</button><div class="in">
+<h1>A320 VR cockpit — hands-only development blueprint</h1>
+<p>Target: seated captain's-seat experience on Meta Quest (standalone + PC link) or PC VR, interacting only through tracked hands or controllers. This page is a working web prototype of the interaction model described below.</p>
+
+<h2>1. System architecture &amp; tech stack</h2>
+<h3>Engine choice</h3>
+<table><tr><th></th><th>Unity 6 (recommended)</th><th>Unreal Engine 5</th></tr>
+<tr><td>Fit</td><td>Fast iteration, mature Quest/standalone path, huge XR sample base, C# SimConnect wrapper works as-is</td><td>Best fidelity (Lumen, Nanite) for PC VR; heavier on Quest</td></tr>
+<tr><td>Hand tracking</td><td>OpenXR Hand Tracking + Meta XR Interaction SDK (ISDK) or XR Interaction Toolkit (XRI) Hands</td><td>OpenXR Hand Tracking plugin + Meta XR plugin</td></tr>
+<tr><td>Pick when</td><td>You want standalone Quest + PC Link from one code base</td><td>You only ship PC VR and want film-grade cockpit materials</td></tr></table>
+<h3>Layers</h3>
+<ol>
+<li><b>XR layer:</b> OpenXR runtime, XR Plug-in Management, Meta XR Core SDK + Interaction SDK (Poke, Grab, Ray, Hand pose, Haptics). Fall back to XRI if you must stay vendor-neutral.</li>
+<li><b>Cockpit layer:</b> one prefab per control type (push button, toggle, guarded switch, rotary knob, lever, slider, window). Each control reads a JSON map entry: <code>{id, type, simVar, event, min, max, detents, hapticProfile}</code>.</li>
+<li><b>Bridge layer:</b> a small Windows service next to the sim that speaks to the sim and exposes WebSocket (JSON, 30–60 Hz push) to the headset app. Standalone Quest talks to it over Wi-Fi 6; PC-link builds can call it in-process.</li>
+<li><b>Sim layer:</b> MSFS 2020/2024 or X-Plane 12 with an A320 add-on.</li>
+</ol>
+<h3>Sim integration</h3>
+<ul>
+<li><b>MSFS + FlyByWire A32NX (free, open source):</b> SimConnect for standard SimVars/events; <b>MobiFlight WASM module</b> to read/write <code>L:</code> variables and fire <code>H:</code> events (the A32NX cockpit is driven almost entirely by L:vars such as the A32NX_* family). Use SimConnect client-data areas for efficient batched reads.</li>
+<li><b>X-Plane 12:</b> UDP datarefs / commands (XPlaneConnect or a small XPLM plugin) with ToLiss, FlightFactor or Zibo-style Airbus add-ons.</li>
+<li><b>Hardware option:</b> an ESP32 glove (as in this page) posts finger flex JSON over HTTP/WebSocket; poll at 80 ms or less, prefer WebSocket push.</li>
+<li><b>Authority rule:</b> the sim owns truth. The headset sets the local animation instantly (optimistic UI) and reconciles when the sim value arrives.</li>
+</ul>
+<h3>Build order</h3>
+<ol><li>Greybox cockpit at 1:1 scale from A320 drawings, seat eye-point at ~(0, 1.22 m).</li><li>Bridge with five test controls (BAT1, EXT PWR, ADIRS knob, throttle, flaps).</li><li>Control prefab library + JSON map for all ~150 overhead/pedestal controls.</li><li>Procedure engine (this page's task list) driven by sim state.</li><li>Audio, lighting, comfort, optimisation.</li></ol>
+
+<h2>2. Cockpit ergonomics &amp; hand mechanics</h2>
+<ul>
+<li><b>Interactors:</b> a <b>Poke interactor</b> on each index fingertip for pushbuttons and toggles; a <b>Grab interactor</b> (pinch / palm) for knobs, levers, window; a <b>Ray interactor</b> only as an accessibility/far fallback, never active at the same time as Poke on the same hand.</li>
+<li><b>Push buttons (BAT, EXT PWR, pumps, APU):</b> poke with 6–8 mm travel, latch past 70 % depth, release at 40 % (hysteresis). Face light changes state only when the sim confirms.</li>
+<li><b>Toggle switches (exterior lights, ENG masters):</b> grab or poke-flick; hinge constrained to ±30°, snap to the nearer end, 2-stage click haptic.</li>
+<li><b>Rotary knobs (ADIRS, ENG MODE):</b> grab + twist; map wrist roll delta to knob angle with a 0.3 gain, snap to detents every 40–60°. Drag-sideways fallback for hand tracking.</li>
+<li><b>Throttle levers:</b> grab constrained to one axis, value clamped 0–1, magnetic detents at IDLE, CLB/MCT, TOGA with a haptic tick; both levers can be gripped together with a wide hand.</li>
+<li><b>Flaps lever / sliding window:</b> axis-constrained translate along a rail with discrete detents (flaps) or continuous (window).</li>
+<li><b>Haptics (controllers):</b> hover enter 0.1 amp / 10 ms; press 0.5 / 25 ms; detent 0.35 / 15 ms; stop-end 0.7 / 40 ms. <b>Bare-hand:</b> audio click + visible depress + optional glove vibration motor.</li>
+<li><b>Hand visuals:</b> keep the rendered hand "pinned" to the control surface while interacting (visual-penetration clamp) so fingers never pass through panels.</li>
+<li><b>Reach:</b> overhead is above natural arm range — allow a 15° seat recline offset or raise the hand-reach "virtual arm" by 10 % for overhead only.</li>
+</ul>
+
+<h2>3. Cold &amp; dark to taxi — procedure checklist</h2>
+<p>Items marked ★ are in this prototype. Real timings are longer; this build uses an accelerated ADIRS (≈15 s) and APU (≈12 s).</p>
+<h3>A. Electrical power-up</h3><ol><li>★ BAT 1 and BAT 2 pushbuttons — ON (OFF light extinguishes).</li><li>★ EXT PWR — AVAIL green → push ON. AC BUS 1/2 powered.</li><li>Check ECAM ELEC page: voltages, no amber.</li></ol>
+<h3>B. Systems alignment</h3><ol><li>★ ADIRS 1, 2, 3 selectors — NAV.</li><li>★ Wait for alignment; PFD ATT/HDG/SPD flags clear. (Real: ≈ 10 min, ~1 min with fast align.)</li><li>Enter position/route in MCDU (INIT A, INIT B, F-PLN, PERF) — planned next module.</li></ol>
+<h3>C. APU and bleed</h3><ol><li>★ APU MASTER — ON.</li><li>★ APU START — ON; ★ wait for AVAIL.</li><li>★ APU GEN — ON (EXT PWR drops off line).</li><li>★ APU BLEED — ON.</li></ol>
+<h3>D. Flight preparation</h3><ol><li>★ Fuel pumps — all ON.</li><li>★ BEACON — ON.</li><li>★ Flaps — set for take-off (config 1+F shown).</li><li>Set altimeters, transponder, seat-belt / no-smoking signs, trim, load sheet cross-check.</li></ol>
+<h3>E. Engine start</h3><ol><li>★ ENG MODE — IGN/START.</li><li>★ ENG 2 MASTER — ON; ★ wait for stable idle (N2 passes starter cut-out, EGT stable).</li><li>★ ENG 1 MASTER — ON; ★ wait for stable idle.</li><li>★ ENG MODE — NORM.</li></ol>
+<h3>F. Before taxi</h3><ol><li>★ NAV &amp; LOGO — ON; taxi light, strobes as required.</li><li>★ Release PARK BRK.</li><li>★ Advance both throttles gently for taxi thrust (outside world starts to move).</li><li>Flight-control check, ECAM memo clean, clearance received.</li></ol>
+
+<h2>4. Immersive VR features</h2>
+<ul>
+<li><b>Interactive cabin items (★ in prototype):</b> coffee cup you lift to your face, sun visor, cabin CALL button with chime. Next: tray table, cockpit door with keypad, flight bag, headset hook, tablet (EFB) you hold.</li>
+<li><b>Opening windows with ambient sound (★):</b> the captain's sliding window drags open; the audio mixer cross-fades from a muffled interior bed to wind, apron and ground-crew sound. Add real occlusion: low-pass cutoff = f(window openness) per emitter.</li>
+<li><b>Spatial audio:</b> engine spool from the correct side, APU whine from behind, ECAM chimes inside the cockpit, ground power hum when EXT PWR is connected.</li>
+<li><b>Room-scale / seat-scale:</b> a one-time <i>seat calibration</i> (sit, press "Set eye-point"); lean ±35 cm to look around the glareshield; optional stand-up mode that teleports to the jump-seat or walks the guardian boundary to the cabin door.</li>
+<li><b>Environment:</b> day/night/dusk presets, dynamic sun through the windshield, rain on glass, vibration cue on engine start (very low amplitude, comfort-safe), passthrough "coffee-table" mode to see a real keyboard/MCDU.</li>
+<li><b>Instruction layer:</b> amber AR rings on the next control (★), a hand-ghost demo, instructor mode streaming scores over WebSocket.</li>
+</ul>
+
+<h2>5. Core challenges &amp; solutions</h2>
+<table><tr><th>Problem</th><th>Solution</th></tr>
+<tr><td>Hand-tracking jitter</td><td>One-Euro filter on fingertip and wrist (low cutoff when slow, high when fast) — ★ used here; confidence gating (freeze last pose below 0.5); controller fallback; magnet/sticky hover with 150–200 ms release grace.</td></tr>
+<tr><td>Accidental presses in a cramped panel</td><td>Index-tip-only poke collider (3–5 mm); required hover dwell (60–150 ms) before a press counts — ★; press depth + hysteresis; ignore pokes while the hand moves faster than ~1.2 m/s; 150 ms post-release lockout — ★; guarded covers for critical switches (ENG FIRE, EVAC); disable overhead interactors when the head is not looking up; "safe hand" palm-up gesture.</td></tr>
+<tr><td>Input latency</td><td>Run interaction locally (set animation instantly, reconcile with sim); WebSocket/UDP push at 30–60 Hz instead of HTTP polling (original glove poll 500 ms → 80 ms here); batch SimVar reads; avoid per-frame allocations; target 72–90 Hz render, fixed foveated rendering, async reprojection (ATW/ASW); budget: head motion-to-photon &lt; 20 ms, press-to-sim &lt; 100 ms.</td></tr>
+<tr><td>Comfort</td><td>No artificial camera motion except slow taxi (world slides at ≤ 15 kt), vignette on speed, 90° snap options, persistent cockpit frame as a visual anchor.</td></tr>
+<tr><td>Performance on Quest</td><td>Baked lighting, texture atlases for panel faces, GPU instancing for switches, LODs on seats/cabin, render screens at 512² and update at 5–10 Hz.</td></tr></table>
+</div></div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+const $=id=>document.getElementById(id);
+const clamp=THREE.MathUtils.clamp;
+
+/* =====================================================================
+   BACKEND: ESP32 glove (kept from the original simulator)
+   ===================================================================== */
+const fingerKeys=['thumb','index','middle','ring'];
+const fingerAliases={thumb:['thumb','th','f0','t','flex1','flex_1','sensor1','sensor_1'],index:['index','i','f1','flex2','flex_2','sensor2','sensor_2'],middle:['middle','m','f2','flex3','flex_3','sensor3','sensor_3'],ring:['ring','r','f3','flex4','flex_4','sensor4','sensor_4']};
+const calibration=Object.fromEntries(fingerKeys.map(k=>[k,{straight:0,bent:100}]));
+try{const s=JSON.parse(localStorage.getItem('anesthesia_calibration')||'null');if(s&&typeof s==='object')for(const k of fingerKeys){const c=s[k];if(c&&Number.isFinite(c.straight)&&Number.isFinite(c.bent)&&c.straight>=0&&c.straight<=100&&c.bent>=0&&c.bent<=100&&c.straight!==c.bent)calibration[k]=c}}catch(e){console.warn('Saved glove calibration could not be loaded.',e)}
+let connected=false,connecting=false,data={},lastPacketAt=0,pollController=null,connectionAttempt=0,gloveTilt=null,gloveNeutralTilt=null,gloveGrab=false;
+const say=t=>{$('cue').textContent=t};
+window.toggleMenu=()=>$('ui').classList.toggle('closed');
+window.toggleBP=()=>$('bp').classList.toggle('open');
+window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};say('Glove pose centered. Tilt the glove to steer the hand.')};
+window.saveCalibration=()=>{for(const k of fingerKeys){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter valid straight,bent readings from 0 to 100 for the ${k}.`);return}calibration[k]={straight:p[0],bent:p[1]}}
+  try{localStorage.setItem('anesthesia_calibration',JSON.stringify(calibration))}catch(e){say('Calibration could not be saved in this browser.');return}say('Calibration saved. Flex the fingers to verify.')};
+window.resetCalibration=()=>{for(const k of fingerKeys){calibration[k]={straight:0,bent:100};$('cal-'+k).value=''}try{localStorage.removeItem('anesthesia_calibration')}catch(e){}};
+function sensorValue(key,packet=data){for(const src of [packet.flex,packet.fingers,packet]){if(!src||typeof src!=='object')continue;
+  if(Array.isArray(src)){const v=src[fingerKeys.indexOf(key)];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v);continue}
+  for(const a of fingerAliases[key]){const v=src[a];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v)}}return null}
+function normalizeSensor(key,value){if(!Number.isFinite(value))return null;const c=calibration[key];return clamp((value-c.straight)/(c.bent-c.straight),0,1)}
+const hasValidSensorPacket=p=>fingerKeys.some(k=>sensorValue(k,p)!==null);
+function updateGloveTilt(p){const{ax,ay,az}=p;if(![ax,ay,az].every(v=>Number.isFinite(Number(v))))return;const x=+ax,y=+ay,z=+az;if(Math.hypot(x,y,z)<.1)return;
+  gloveTilt={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
+function showConnectionHelp(t){const h=$('help');h.textContent=t;h.hidden=!t}
+const POLL_MS=80; // delay between /data requests (the original used 500)
+const IPRE=/^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const setConn=(on,text)=>{$('dot').classList.toggle('on',on);$('ct').textContent=text};
+function gloveUrl(){
+  let v=$('ip').value.trim().replace(/\s+/g,'');if(!v)return null;
+  if(!/^https?:\/\//i.test(v))v='http://'+v;
+  try{const u=new URL(v);if(!IPRE.test(u.hostname)&&!/^[\w-]+(\.[\w-]+)*\.local$/i.test(u.hostname))return null;
+    if(u.pathname==='/'||u.pathname==='')u.pathname='/data';return u.toString()}catch(e){return null}}
+window.disconnectESP=()=>{connectionAttempt++;connected=connecting=gloveGrab=false;if(pollController){pollController.abort();pollController=null}setConn(false,'Glove: not connected (mouse mode)');showConnectionHelp('')};
+window.openGloveData=()=>{const u=gloveUrl();if(!u){showConnectionHelp('Enter the current IPv4 address printed in the ESP32 Serial Monitor first.');return}window.open(u,'_blank','noopener,noreferrer')};
+async function explainFailure(ip,url,error){
+  const tag=`  [${error&&error.name}: ${error&&error.message} · page ${location.protocol}//${location.host||'local file'}]`;
+  if(window.self!==window.top)return `This page is running inside a preview frame (for example inside Claude). The frame blocks plain-HTTP requests to your ESP32, so it can never connect from here. Download the code, save it as index.html on your computer and open that file in Chrome.`+tag;
+  if(location.protocol==='https:')return `This page is open over HTTPS, so the browser blocks the plain-HTTP request to ${url}. Open the file from your own device (file:// or http://), or in Chrome allow “Insecure content” for this site, then connect again.`+tag;
+  let reachable=false;
+  try{let t2;await Promise.race([fetch(url,{mode:'no-cors'}),new Promise((_,rej)=>{t2=setTimeout(()=>rej(new Error('timeout')),2000)})]);clearTimeout(t2);reachable=true}catch(e){}
+  if(reachable)return `The ESP32 at ${ip} answered, but the browser may not read the data because /data has no CORS header. In the ESP32 sketch add server.sendHeader("Access-Control-Allow-Origin","*") before sending the JSON.`+tag;
+  return `Nothing answered at ${ip}. Check that the ESP32 and this device are on the same Wi-Fi (not mobile data or a guest network), that the IP matches the Serial Monitor, and that “Test /data in browser” shows JSON.`+tag}
+window.connectESP=async()=>{
+  const url=gloveUrl(),ip=url?new URL(url).host:'';
+  if(!url){setConn(false,'Invalid ESP32 address');showConnectionHelp('Enter the glove’s IPv4 address (for example 192.168.1.50 or 192.168.1.50:81).');return}
+  if(connecting)return;const attempt=++connectionAttempt;connecting=true;connected=false;setConn(false,'Glove: connecting…');showConnectionHelp('');
+  while(connecting&&attempt===connectionAttempt){
+    const controller=new AbortController();pollController=controller;let to,timedOut=false;
+    try{
+      const r=await Promise.race([fetch(url),new Promise((_,rej)=>{to=setTimeout(()=>{timedOut=true;rej(new Error('Timed out waiting for the ESP32'))},1800)})]);if(!r.ok)throw new Error(`ESP32 returned HTTP ${r.status}`);
+      const p=await r.json();if(!p||typeof p!=='object'||Array.isArray(p)||!hasValidSensorPacket(p))throw new Error('ESP32 packet contains no valid finger sensor readings.');
+      if(attempt!==connectionAttempt)break;
+      data={...data,...p};updateGloveTilt(p);lastPacketAt=performance.now();connected=true;setConn(true,'Glove: connected');showConnectionHelp('');gloveGrab=Number(p.click)===1;
+    }catch(error){
+      if(!connecting||attempt!==connectionAttempt)break;connected=gloveGrab=false;setConn(false,'Glove: reconnecting…');
+      if(timedOut||error instanceof TypeError||/failed to fetch|networkerror|load failed/i.test(String(error&&error.message)))showConnectionHelp(await explainFailure(ip,url,error));
+      else showConnectionHelp(`Could not read ${url}: ${error instanceof Error?error.message:error}. The ESP32 must return JSON with at least one finger reading (thumb, index, middle or ring, 0 to 100).`);
+    }finally{clearTimeout(to);if(pollController===controller)pollController=null}
+    if(connecting&&attempt===connectionAttempt)await new Promise(r=>setTimeout(r,POLL_MS));
+  }
+  if(attempt===connectionAttempt)connecting=false};
+
+/* glove -> hand input: mean of index/middle/ring bend (or the glove button) */
+function gloveGripValue(){
+  const b=['index','middle','ring'].map(k=>{const r=sensorValue(k);return r===null?null:normalizeSensor(k,r)}).filter(x=>x!==null);
+  const fingers=b.length?b.reduce((a,c)=>a+c)/b.length:0;return Math.max(fingers,gloveGrab?.7:0)}
+
+/* =====================================================================
+   SIMULATION: A320 flight deck
+   ===================================================================== */
+const M=(c,r=.6,m=0,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,...o});
+const add=(p,g,m,pos,rot,sc)=>{const o=new THREE.Mesh(g,m);if(pos)o.position.set(...pos);if(rot)o.rotation.set(...rot);if(sc)o.scale.set(...sc);p.add(o);return o};
+const box=(p,m,pos,s)=>add(p,new THREE.BoxGeometry(...s),m,pos);
+const cyl=(p,m,pos,r,h,rot,r2)=>add(p,new THREE.CylinderGeometry(r,r2??r,h,20),m,pos,rot);
+const sph=(p,m,pos,sc)=>add(p,new THREE.SphereGeometry(1,20,14),m,pos,null,sc);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),Y=V(0,1,0),Z=V(0,0,1);
+function noiseTex(base,jit,n=700){const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,256);
+  for(let i=0;i<n;i++){const r=4+Math.random()*22,a=Math.random()*.1;x.fillStyle=`rgba(${jit[0]+Math.random()*jit[3]|0},${jit[1]+Math.random()*jit[3]|0},${jit[2]+Math.random()*jit[3]|0},${a})`;x.beginPath();x.arc(Math.random()*256,Math.random()*256,r,0,7);x.fill()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;return t}
+
+const ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+ren.setPixelRatio(Math.min(devicePixelRatio,1.8));ren.setSize(innerWidth,innerHeight);ren.outputColorSpace=THREE.SRGBColorSpace;
+ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.0;document.body.prepend(ren.domElement);
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xbcd6e8);scene.fog=new THREE.Fog(0xcfdfe8,70,280);
+const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.03,400);cam.rotation.order='YXZ';scene.add(cam);
+const HOME=V(-.42,1.42,.55);cam.position.copy(HOME);
+scene.add(new THREE.HemisphereLight(0xffffff,0x9aa7ab,.9));
+const sun=new THREE.DirectionalLight(0xfff4e0,1.1);sun.position.set(-4,9,-6);scene.add(sun);
+const dome=new THREE.PointLight(0xfff6ea,6,4.5,1.6);dome.position.set(0,1.9,.3);scene.add(dome);
+
+/* ---------- sky + apron (moves as the aircraft taxis) ---------- */
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(200,24,12),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,
+  vertexShader:'varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:['varying vec3 p;void main(){float h=clamp(normalize(p).y,0.,1.);vec3 c=mix(vec3(.88,.93,.95),vec3(.28,.54,.86),pow(h,.55));gl_FragColor=vec4(c,1.);','#include <tonemapping_fragment>','#include <colorspace_fragment>','}'].join('\n')})));
+const GY=-4.6,world=new THREE.Group(),strip=new THREE.Group();const outside=new THREE.Group(),gnd=new THREE.Group(),tw=new THREE.Group();outside.add(world,strip,gnd,tw);scene.add(outside);
+const apronTex=noiseTex('#6c7378',[100,105,110,60]);apronTex.repeat.set(40,40);
+add(gnd,new THREE.PlaneGeometry(900,900),M(0x6c7378,.95,0,{map:apronTex}),[0,GY,-100],[-Math.PI/2,0,0]);
+for(const sx of[-1,1])add(gnd,new THREE.PlaneGeometry(300,900),M(0x6f9a58,1),[sx*260,GY+.02,-100],[-Math.PI/2,0,0]);
+for(let k=0;k<22;k++)box(strip,M(0xf0c419,.7),[0,GY+.03,-12*k+6],[.35,.02,5]);
+box(tw,M(0x555b60,.95),[0,GY+.015,-100],[22,.02,900]);
+for(const sx of[-1,1]){box(tw,M(0xf0c419,.7),[sx*10.6,GY+.03,-100],[.25,.02,900]);for(let k=0;k<22;k++)sph(strip,new THREE.MeshBasicMaterial({color:0x2d7bff}),[sx*12,GY+.15,-12*k+3],[.12,.12,.12])}
+const cloudTex=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,4,64,64,62);g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)})();
+for(let i=0;i<16;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:cloudTex,fog:false,depthWrite:false,transparent:true,opacity:.8})),a=i*.39;s.position.set(Math.sin(a)*170,35+(i*37%40),-Math.cos(a)*170);s.scale.set(60+i%4*14,22,1);scene.add(s)}
+/* airport scenery: built once, repeated every 320 m so taxiing never runs out of airport */
+const S=new THREE.Group();
+const facade=(()=>{const c=document.createElement('canvas');c.width=128;c.height=64;const x=c.getContext('2d');x.fillStyle='#5f8aa3';x.fillRect(0,0,128,64);x.fillStyle='#cfe3ee';for(let i=0;i<4;i++)x.fillRect(0,6+i*15,128,9);x.fillStyle='#e8eef0';for(let j=0;j<8;j++)x.fillRect(j*16,0,2,64);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,1);t.colorSpace=THREE.SRGBColorSpace;return t})();
+const jet=(x,z,ry,col)=>{const g=new THREE.Group();g.position.set(x,GY+3.2,z);g.rotation.y=ry;S.add(g);const b=M(col,.4);
+  cyl(g,b,[0,0,0],1.9,36,[Math.PI/2,0,0]);sph(g,b,[0,0,-18],[1.9,1.9,3.2]);sph(g,b,[0,0,18],[1.9,1.9,5]);box(g,M(col,.5),[0,-.6,2],[34,.3,6]);
+  box(g,M(0x1f3e63,.5),[0,5,17],[.4,6,5]);box(g,M(col,.5),[0,1,17],[10,.25,3.5]);box(g,M(0x14202a,.3),[0,.7,-15.5],[3.6,.3,1.5]);
+  for(const s of[-1,1])cyl(g,M(0x888f93,.5),[s*6,-1.4,1],1,3.4,[Math.PI/2,0,0])};
+box(S,M(0xffffff,.4,.1,{map:facade}),[-78,GY+7,-95],[30,14,120]);box(S,M(0xdfe6e9,.6),[-78,GY+14.4,-95],[32,.8,122]);
+for(const z of[-60,-120])box(S,M(0xc9d3d6,.6),[-54,GY+4.5,z],[22,2.4,2.8]);
+jet(-36,-60,0,0xf2f4f5);jet(-36,-120,0,0xe4ecf2);jet(58,-150,.3,0xe8edee);jet(46,-250,-.2,0xf0f2f3);
+cyl(S,M(0xd7dde0,.6),[80,GY+16,-130],3.2,32);box(S,M(0x7aa4b8,.2,.4),[80,GY+33,-130],[9,4,9]);
+box(S,M(0x9aa6ad,.7),[150,GY+6,-230],[40,12,50]);box(S,M(0x6c7a82,.7),[150,GY+12.4,-230],[42,1,52]);
+box(S,M(0xe9eef0,.5),[-22,GY+1.2,-45],[2.4,1.6,6]);cyl(S,M(0xe9eef0,.4),[-22,GY+2.6,-45],1.1,5.4,[Math.PI/2,0,0]);
+box(S,M(0xf5c518,.5),[-18,GY+.8,-20],[1.6,1.4,2.4]);box(S,M(0xf5c518,.5),[16,GY+.8,-35],[1.8,1.2,4]);box(S,M(0x2f6f4f,.5),[14,GY+1.1,-90],[2.6,2.2,5]);
+for(const[x,z]of[[-14,-34],[-9,-26],[16,-60],[-13,-100]])cyl(S,M(0xf59e0b,.6),[x,GY+.35,z],.01,.7,null,.18);
+for(let i=0;i<14;i++)for(const sx of[-1,1]){const x=sx*((sx>0?160:125)+(i*17%30)),z=-i*23-10;cyl(S,M(0x5a3c22,1),[x,GY+1.2,z],.25,2.4);add(S,new THREE.ConeGeometry(2,5,8),M(0x2f6a35,1),[x,GY+4.5,z])}
+const RX=105,wl=M(0xf2f2f2,.7),rl=new THREE.MeshBasicMaterial({color:0xffffff});box(S,M(0x3a3f43,.95),[RX,GY+.05,-160],[34,.02,320]);
+for(let k=0;k<8;k++){box(S,wl,[RX,GY+.07,-20-k*40],[.8,.02,16]);for(const sx of[-1,1])sph(S,rl,[RX+sx*17.5,GY+.15,-20-k*40],[.15,.15,.15])}
+for(const sx of[-1,1]){box(S,wl,[RX+sx*15.8,GY+.07,-160],[.4,.02,320]);for(const z of[-60,-220])for(let j=0;j<3;j++)box(S,wl,[RX+sx*(6+j*2.4),GY+.07,z],[1.2,.02,22])}
+world.add(S);const S2=S.clone();S2.position.z=-320;world.add(S2);
+for(const[x,z,r,h]of[[-120,-230,60,36],[40,-250,70,44],[150,-220,55,30]])add(gnd,new THREE.ConeGeometry(r,h,6),M(0x587a52,1),[x,GY+h/2,z]);
+
+/* ---------- flight-deck shell ---------- */
+const dark=M(0x2a3a4a,.85,0,{map:noiseTex('#26323f',[30,45,60,40])}),mid=M(0x2c3a48,.8),light=M(0x4b5a6b,.85),trim=M(0x10171d,.6),pad=M(0x151c24,.9);
+box(scene,mid,[0,-.05,.4],[2.1,.1,2.4]);box(scene,light,[0,2.38,.4],[1.1,.06,2.4]);
+for(const sx of[-1,1]){const p=box(scene,light,[sx*.79,2.29,.4],[.52,.05,2.4]);p.rotation.z=-sx*.36}
+for(const sx of[-1,1]){const X0=sx*1.03;
+  box(scene,dark,[X0,.5,.4],[.06,1.0,2.4]);box(scene,dark,[X0,2.025,.4],[.06,.35,2.4]);box(scene,dark,[X0,1.425,-.62],[.06,.85,.55]);box(scene,dark,[X0,1.425,.96],[.06,.85,1.28]);
+  if(sx>0)add(scene,new THREE.BoxGeometry(.012,.85,.72),M(0x9fc9e4,.1,.2,{transparent:true,opacity:.22}),[.985,1.425,-.01])}
+box(scene,dark,[0,2.1,-.8],[2.1,.2,.2]);for(const sx of[-1,1])box(scene,dark,[sx*.97,1.6,-.8],[.12,.8,.2]);
+const WS=new THREE.Group();WS.position.set(0,1.6,-.84);WS.rotation.x=.28;scene.add(WS); /* sloped airliner windshield */
+for(const x of[-.62,0,.62])box(WS,trim,[x,0,0],[.05,.82,.05]);box(WS,trim,[0,.41,0],[2,.05,.05]);box(WS,trim,[0,-.41,0],[2,.05,.05]);
+add(WS,new THREE.PlaneGeometry(1.95,.82),new THREE.MeshBasicMaterial({color:0xcfe7f5,transparent:true,opacity:.06,depthWrite:false}),[0,0,-.02]);
+for(const x of[-.3,.3])box(WS,trim,[x,-.3,.02],[.012,.34,.012]).rotation.z=x>0?.5:-.5;
+box(scene,M(0xe6ebee,.5),[0,.78,-1.9],[2.2,.5,2.4]).rotation.x=.14;sph(scene,M(0xdde3e6,.4),[0,.68,-3.3],[1.1,.55,1.6]);
+box(scene,mid,[0,.95,1.62],[2.1,2.2,.06]);box(scene,dark,[0,.95,1.58],[.7,1.9,.02]);box(scene,light,[.22,.95,1.565],[.04,.1,.02]);
+box(scene,dark,[0,1.255,-.52],[2.0,.05,.3]);box(scene,pad,[0,.5,-.58],[2.0,1.0,.1]);
+box(scene,mid,[-.8,.5,.2],[.35,.9,1.2]);box(scene,mid,[.8,.5,.2],[.35,.9,1.2]);
+for(const sx of[-1,1]){box(scene,pad,[sx*.42,.3,.8],[.5,.5,.5]);box(scene,pad,[sx*.42,.78,1.05],[.5,.72,.1])}
+
+const pedestal=box(scene,M(0x34404d,.7),[0,.5,0],[.34,.72,.9]);const PY=.86;
+for(const cx of[-.42,.42])for(const dx of[-.1,.1]){box(scene,trim,[cx+dx,.16,-.36],[.1,.17,.02]).rotation.x=.55;box(scene,trim,[cx+dx,.05,-.3],[.03,.1,.03])} /* rudder pedals */
+
+for(const sx of[-1,1]){box(scene,pad,[sx*.42,1.18,1.08],[.26,.16,.08]);box(scene,pad,[sx*.7,.98,.8],[.06,.04,.4]);cyl(scene,trim,[sx*.8,.97,-.1],.012,.07)}
+for(const[x,c]of[[-.62,0xd62d20],[.62,0xd62d20],[-.5,0xffb547],[.5,0xffb547]])box(scene,new THREE.MeshBasicMaterial({color:c}),[x,1.29,-.5],[.07,.015,.05]);
+
+/* ---------- main instrument panel ---------- */
+const MP=new THREE.Group();MP.position.set(0,.97,-.5);MP.rotation.x=-.25;scene.add(MP);
+const mpBoard=box(MP,M(0x1d2733,.7),[0,0,0],[1.9,.5,.02]);
+/* ---------- overhead panel ---------- */
+const OH=new THREE.Group();OH.position.set(0,2.0,-.05);OH.rotation.x=-.3;scene.add(OH);
+const ohBoard=box(OH,M(0x1a2430,.75),[0,0,0],[1.6,.03,.92]);
+const SURF=[mpBoard,ohBoard,pedestal];
+
+/* ---------- labels / faces ---------- */
+const lbls=[];
+function label(p,text,x,y,z,w,h,mode,col='#e6eef0',px){
+  const c=document.createElement('canvas');c.width=Math.max(32,Math.round(w*1600));c.height=Math.max(16,Math.round(h*1600));const g=c.getContext('2d');
+  let sz=px||Math.round(c.height*.66);g.font=`700 ${sz}px sans-serif`;while(g.measureText(text).width>c.width*.95&&sz>6){sz--;g.font=`700 ${sz}px sans-serif`}
+  g.fillStyle=col;g.textAlign='center';g.textBaseline='middle';g.fillText(text,c.width/2,c.height/2+1);
+  const tx=new THREE.CanvasTexture(c);tx.colorSpace=THREE.SRGBColorSpace;tx.anisotropy=4;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tx,transparent:true,toneMapped:false,depthWrite:false}));
+  m.position.set(x,y,z);m.rotation.x=mode==='oh'?Math.PI/2:-Math.PI/2;p.add(m);lbls.push(m);return m}
+const ftc={};
+function faceTex(txt,fg,bg='#10181b'){const k=txt+fg+bg;if(ftc[k])return ftc[k];const c=document.createElement('canvas');c.width=128;c.height=96;const x=c.getContext('2d');
+  x.fillStyle=bg;x.fillRect(0,0,128,96);x.strokeStyle='#3b4a50';x.lineWidth=4;x.strokeRect(2,2,124,92);x.fillStyle=fg;x.font='700 36px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,64,50);
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return ftc[k]=t}
+function section(x,z,w,d,title){box(OH,M(0x27323a,.8),[x,-.016,z],[w,.002,d]);label(OH,title,x,-.0182,z+d/2-.016,w,.026,'oh','#7fa3ad',18)}
+
+/* ---------- interactable registry ---------- */
+const items={},itemList=[],proxies=[];
+function mkItem(o){
+  const it={kind:'toggle',n:2,gain:1.5,load:3,extra:false,dir:1,...o,state:o.init||0,shown:o.init||0,init:o.init||0};
+  const geo=new THREE.BoxGeometry(...o.size);const px=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({visible:false}));
+  px.position.set(...o.pos);o.parent.add(px);px.userData.item=it;
+  const ol=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0xffb547,depthTest:false,transparent:true}));ol.visible=false;ol.renderOrder=12;px.add(ol);
+  it.px=px;it.ol=ol;it.fmt=o.fmt||(s=>s>.5?'ON':'OFF');items[o.id]=it;itemList.push(it);proxies.push(px);return it}
+const I=id=>items[id].state;
+
+/* overhead pushbutton with annunciator */
+function pushBtn(id,lab,x,z,o={}){
+  const g=new THREE.Group();g.position.set(x,-.015,z);g.rotation.x=Math.PI;OH.add(g);
+  box(g,M(0x0c1215,.5),[0,.011,0],[.078,.022,.062]);
+  const tOff=faceTex(o.off||'OFF',o.offc||'#e9eef0'),tOn=faceTex(o.on||'ON',o.onc||'#38e07a','#0f2a20');
+  const face=new THREE.Mesh(new THREE.PlaneGeometry(.066,.05),new THREE.MeshBasicMaterial({map:tOff,toneMapped:false}));face.rotation.x=-Math.PI/2;face.position.y=.0225;g.add(face);
+  label(OH,lab,x,-.0182,z+.056,.1,.03,'oh');
+  return mkItem({id,label:lab,kind:o.kind||'toggle',parent:OH,pos:[x,-.035,z],size:[.085,.06,.07],grp:o.grp,load:3,vis:s=>{face.material.map=s>.5?tOn:tOff;g.position.y=-.015+(s>.5?.004:0)}})}
+/* overhead rotary selector */
+function knob(id,lab,x,z,names,grp){
+  const g=new THREE.Group();g.position.set(x,-.015,z);g.rotation.x=Math.PI;OH.add(g);
+  cyl(g,M(0x0c1215,.5),[0,.012,0],.034,.024);const kn=new THREE.Group();kn.position.y=.024;g.add(kn);
+  cyl(kn,M(0x3b4850,.4,.3),[0,.012,0],.026,.024);box(kn,new THREE.MeshBasicMaterial({color:0xf2f2f2}),[0,.026,.012],[.006,.004,.026]);
+  label(OH,lab,x,-.0182,z+.056,.1,.03,'oh');label(OH,names.join('  '),x,-.0182,z-.056,.1,.024,'oh','#9fb2b8',18);
+  return mkItem({id,label:lab,kind:'knob',n:names.length,parent:OH,pos:[x,-.04,z],size:[.085,.07,.085],grp,load:2,fmt:s=>names[Math.round(s)],init:o0(names),vis:s=>{kn.rotation.y=-(s-1)*.8}})}
+const o0=n=>0;
+/* toggle switch (overhead hanging or pedestal standing) */
+function toggleSw(id,lab,parent,x,y,z,flip,grp,ball=0xd8dfe2,px){
+  const g=new THREE.Group();g.position.set(x,y,z);if(flip)g.rotation.x=Math.PI;parent.add(g);
+  cyl(g,M(0x0c1215,.5),[0,.006,0],.022,.012);const pv=new THREE.Group();pv.position.y=.012;g.add(pv);
+  cyl(pv,M(0xb8c3c7,.3,.6),[0,.025,0],.007,.05);sph(pv,M(ball,.35,.2),[0,.052,0],[.014,.014,.014]);
+  return mkItem({id,label:lab,kind:'toggle',parent,pos:[x,flip?y-.05:y+.04,z],size:[.08,.09,.08],grp,load:4,init:px||0,vis:s=>{pv.rotation.x=s>.5?-.5:.5}})}
+function pedLabel(t,x,z,w=.1){label(scene,t,x,PY+.003,z,w,.028,'ped','#cdd9dc')}
+
+/* ---- overhead layout ---- */
+section(-.55,-.27,.36,.2,'ADIRS');section(-.1,-.27,.44,.2,'ELEC');section(.345,-.27,.36,.2,'APU');
+section(-.45,-.05,.5,.2,'FUEL PUMPS');section(.1,-.05,.26,.2,'AIR COND');section(.4,-.05,.16,.2,'CABIN');section(-.45,.17,.44,.2,'EXT LT');
+knob('adirs1','IR 1',-.65,-.27,['OFF','NAV','ATT'],1);knob('adirs2','IR 2',-.55,-.27,['OFF','NAV','ATT'],1);knob('adirs3','IR 3',-.45,-.27,['OFF','NAV','ATT'],1);
+pushBtn('bat1','BAT 1',-.26,-.27,{grp:0});pushBtn('bat2','BAT 2',-.155,-.27,{grp:0});
+pushBtn('ext','EXT PWR',-.05,-.27,{grp:0,off:'AVAIL',offc:'#38e07a',on:'ON',onc:'#5aa9ff'});pushBtn('apugen','APU GEN',.055,-.27,{grp:2});
+pushBtn('apumaster','APU MSTR',.24,-.27,{grp:2});pushBtn('apustart','APU START',.345,-.27,{grp:2,off:'START',offc:'#9fb2b8',on:'ON',onc:'#5aa9ff'});pushBtn('apubleed','APU BLEED',.45,-.27,{grp:2});
+[['pumpL1','L1'],['pumpL2','L2'],['pumpC','CTR'],['pumpR1','R1'],['pumpR2','R2']].forEach(([id,l],i)=>pushBtn(id,'PUMP '+l,-.65+i*.1,-.05,{grp:3}));
+pushBtn('pack1','PACK 1',.05,-.05,{grp:3});pushBtn('pack2','PACK 2',.155,-.05,{grp:3});
+pushBtn('call','CALL',.4,-.05,{kind:'momentary',off:'CALL',offc:'#e9eef0',on:'CALL',onc:'#ffb547'}).extra=true;
+toggleSw('beacon','BEACON',OH,-.6,-.015,.17,true,3);toggleSw('navlogo','NAV&LOGO',OH,-.5,-.015,.17,true,5);toggleSw('strobe','STROBE',OH,-.4,-.015,.17,true,3);toggleSw('land','LAND',OH,-.3,-.015,.17,true,3);
+[['beacon','BEACON',-.6],['navlogo','NAV&LOGO',-.5],['strobe','STROBE',-.4],['land','LAND',-.3]].forEach(([,l,x])=>label(OH,l,x,-.0182,.17+.065,.1,.028,'oh'));
+/* ---- Airbus detail pass: FCU/EFIS, sidesticks, seats, pedestal, dense overhead, cockpit lighting ---- */
+const glowMP=new THREE.PointLight(0x7fe9ff,0,2.4,1.5);glowMP.position.set(0,1.0,-.15);scene.add(glowMP);
+const glowOH=new THREE.PointLight(0xffd9a0,0,2.6,1.5);glowOH.position.set(0,1.75,.15);scene.add(glowOH);
+const sunSp=new THREE.SpotLight(0xfff0d0,4,9,.55,.7,1.2);sunSp.position.set(-1.6,2.8,-3.2);sunSp.target.position.set(-.3,1.15,-.45);scene.add(sunSp,sunSp.target);
+const glow=c=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
+const lcd=(w,h,cells)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#06090b';x.fillRect(0,0,w,h);x.textAlign='center';
+  cells.forEach(([a,b,col],i)=>{const cx=(i+.5)*w/cells.length;x.font='700 '+h*.2+'px sans-serif';x.fillStyle='#d6e4e8';x.fillText(a,cx,h*.28);x.font='700 '+h*.42+'px monospace';x.fillStyle=col||'#ffb547';x.fillText(b,cx,h*.8)});
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t};
+function glarePanel(x,w,cells,nk,btns){const g=new THREE.Group();g.position.set(x,1.315,-.48);g.rotation.x=.5;scene.add(g);box(g,M(0x10171d,.5),[0,0,0],[w,.02,.13]);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w-.04,.05),new THREE.MeshBasicMaterial({map:lcd(512,96,cells),toneMapped:false}));m.rotation.x=-Math.PI/2;m.position.set(0,.0105,-.03);g.add(m);
+  for(let i=0;i<nk;i++){const kx=(i+.5)*w/nk-w/2;cyl(g,M(0x3b4850,.4,.3),[kx,.02,.03],.016,.024);box(g,glow(0xf2f2f2),[kx,.034,.03],[.003,.002,.014])}
+  btns.forEach((c,i)=>box(g,glow(c),[(i+.5)*w/btns.length-w/2,.012,.052],[.026,.006,.014]))}
+glarePanel(0,.74,[['SPD','250'],['HDG','270'],['ALT','03000'],['V/S','+0000']],4,[0x35e65a,0x35e65a,0x5aa9ff,0xffb547,0x35e65a]);
+glarePanel(-.55,.3,[['QNH','1013','#35e6d0']],2,[0x35e6d0,0x35e6d0,0xffb547]);glarePanel(.55,.3,[['QNH','1013','#35e6d0']],2,[0x35e6d0,0x35e6d0,0xffb547]);
+const SG={};function stick(sx){const x=sx*.8,g=new THREE.Group();g.position.set(x,.98,.45);scene.add(g);SG[sx]=g;box(scene,trim,[x,.98,.45],[.1,.04,.14]);cyl(g,trim,[0,.06,0],.012,.1);const gp=box(g,M(0x15191c,.5),[0,.14,-.005],[.045,.1,.05]);gp.rotation.z=-sx*.18;sph(g,glow(0xd62d20),[-sx*.012,.17,-.03],[.007,.007,.007]);box(scene,M(0x15191c,.6),[x,.985,.74],[.1,.04,.3])}
+stick(-1);stick(1);
+mkItem({id:'stick',label:'SIDESTICK',kind:'lever',n:0,parent:scene,pos:[-.8,1.1,.45],size:[.14,.24,.14],grp:6,gain:-2,load:6,fmt:s=>s<.05?'NEUTRAL':Math.round(s*100)+'% BACK',vis:s=>{SG[-1].rotation.x=s*.5}});
+for(const sx of[-1,1]){box(scene,M(0x16120f,.55),[sx*.42,.565,.8],[.5,.03,.5]);box(scene,M(0xe9dfc6,1),[sx*.42,.59,.8],[.44,.025,.44]);box(scene,M(0xe9dfc6,1),[sx*.42,.8,.975],[.4,.5,.03]);box(scene,M(0x16120f,.55),[sx*.42,1.18,1.0],[.3,.16,.05]);
+  box(scene,M(0x10171d,.6),[sx*.995,1.0,-.01],[.09,.04,.72]);box(scene,M(0x10171d,.6),[sx*.995,1.85,-.01],[.09,.04,.72]);
+  cyl(scene,M(0x20272c,.6),[sx*.18,.76,.1],.085,.03,[0,0,Math.PI/2]);cyl(scene,M(0xcfd7da,.5),[sx*.195,.76,.1],.03,.012,[0,0,Math.PI/2]);box(scene,M(0xffffff),[sx*.196,.835,.1],[.01,.012,.02]);
+  const g=new THREE.Group();g.position.set(sx*.08,PY+.02,-.3);g.rotation.x=.3;scene.add(g);box(g,M(0x10171d,.5),[0,0,0],[.13,.02,.18]);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(.1,.07),new THREE.MeshBasicMaterial({map:lcd(256,180,[['MCDU','ACTIVE','#35e65a']]),toneMapped:false}));m.rotation.x=-Math.PI/2;m.position.set(0,.0105,-.04);g.add(m);
+  for(let i=0;i<12;i++)box(g,M(0x3a444a),[(i%4-1.5)*.022,.012,.025+(i/4|0)*.02],[.016,.004,.014])}
+lever('spdbrk','SPD BRK',-.14,.12,{extra:true,col:0x2a3a46});pedLabel('SPD BRK',-.14,.27,.06);
+['0','1','2','3','F'].forEach((t,i)=>label(scene,t,.165,PY+.003,.18-.26*i/4,.03,.028,'ped','#ffd27a'));
+const dsw=(x,z,c=0xd8dfe2)=>{const g=new THREE.Group();g.position.set(x,-.015,z);g.rotation.x=Math.PI;OH.add(g);cyl(g,M(0x0c1215),[0,.006,0],.016,.012);cyl(g,M(0xb8c3c7,.3,.6),[0,.03,0],.005,.04).rotation.x=.4;sph(g,M(c,.4),[0,.052,.014],[.01,.01,.01])};
+const dgd=(x,z)=>{const g=new THREE.Group();g.position.set(x,-.015,z);g.rotation.x=Math.PI;OH.add(g);box(g,M(0x0c1215),[0,.01,0],[.05,.02,.045]);box(g,glow(0xd62d20),[0,.026,0],[.04,.008,.034])};
+const dkn=(x,z)=>{const g=new THREE.Group();g.position.set(x,-.015,z);g.rotation.x=Math.PI;OH.add(g);cyl(g,M(0x0c1215),[0,.01,0],.026,.02);cyl(g,M(0x3b4850,.4,.3),[0,.026,0],.018,.016)};
+[['HYD',-.1,.17,.22,3,'s'],['ANTI ICE',.15,.17,.26,4,'s'],['SIGNS',.43,.17,.2,3,'k'],['ENG FIRE',-.45,.38,.44,4,'g'],['OXY / CVR',-.05,.38,.3,3,'s'],['CAB PRESS',.35,.38,.36,3,'k'],['WIPER',.68,-.05,.2,2,'k'],['GPWS',.68,.17,.2,3,'s']].forEach(([n,x,z,w,c,t])=>{
+  section(x,z,w,z>.3?.14:.2,n);for(let i=0;i<c;i++){const ix=x-w/2+(i+.5)*w/c;(t==='s'?dsw:t==='k'?dkn:dgd)(ix,z-.01)}});
+
+/* ---- pedestal ---- */
+box(scene,M(0x2b343a,.8),[0,PY+.001,0],[.3,.002,.86]);
+function lever(id,lab,x,z0,o){
+  const pv=new THREE.Group();pv.position.set(x,PY,z0);scene.add(pv);
+  cyl(pv,M(0x1a2124),[0,.07,0],.01,.14);box(pv,M(o.col||0x3a444a,.5),[0,.15,0],[.04,.045,.06]);box(scene,M(0x070a0c),[x,PY+.002,z0-.05],[.014,.002,.26]);
+  return mkItem({id,label:lab,kind:'lever',parent:scene,pos:[x,PY+.09,z0-.05],size:[o.w||.042,.2,.34],grp:o.grp,extra:o.extra,gain:o.gain||1.6,load:o.load||10,snaps:o.snaps,n:o.n||0,fmt:o.fmt||(s=>Math.round(s*100)+'%'),vis:s=>{pv.rotation.x=.35-s*(o.sweep||.95)}})}
+lever('thr1','THR 1',-.07,.12,{grp:5,snaps:[0,.6,1],gain:2.2,col:0x2c3a44});lever('thr2','THR 2',-.01,.12,{grp:5,snaps:[0,.6,1],gain:2.2,col:0x2c3a44});
+items.thr1.link='thr2';items.thr2.link='thr1'; /* both throttles move together */
+const FLN=['0','1','2','3','FULL'];
+lever('flaps','FLAPS',.12,.1,{grp:3,n:5,gain:1.0,w:.07,load:14,sweep:.7,col:0xd8b04a,fmt:s=>FLN[Math.round(s*4)]});
+pedLabel('THR 1',-.07,.27,.07);pedLabel('THR 2',-.01,.27,.07);pedLabel('FLAPS',.12,.27,.09);
+toggleSw('eng1','ENG 1 MSTR',scene,-.06,PY,.34,false,4,0x9fb2b8);toggleSw('eng2','ENG 2 MSTR',scene,.03,PY,.34,false,4,0x9fb2b8);
+pedLabel('ENG 1',-.06,.41,.08);pedLabel('ENG 2',.03,.41,.08);
+{const g=new THREE.Group();g.position.set(-.12,PY,.34);scene.add(g);cyl(g,M(0x0c1215,.5),[0,.01,0],.034,.02);const kn=new THREE.Group();kn.position.y=.02;g.add(kn);
+  cyl(kn,M(0x3b4850,.4,.3),[0,.012,0],.026,.024);box(kn,new THREE.MeshBasicMaterial({color:0xf2f2f2}),[0,.026,-.012],[.006,.004,.026]);
+  pedLabel('ENG MODE',-.12,.41,.1);pedLabel('CRK  NORM  IGN',-.12,.275,.1);
+  mkItem({id:'engmode',label:'ENG MODE',kind:'knob',n:3,init:1,parent:scene,pos:[-.12,PY+.03,.34],size:[.085,.07,.085],grp:4,load:2,fmt:s=>['CRANK','NORM','IGN/START'][Math.round(s)],vis:s=>{kn.rotation.y=(s-1)*.8}})}
+{const pv=toggleSw('park','PARK BRK',scene,.12,PY,.34,false,5,0xd62d20,1);pedLabel('PARK BRK',.12,.41,.1);pv.fmt=s=>s>.5?'SET':'RELEASED'}
+
+/* ---- cabin extras ---- */
+const cup=new THREE.Group();cup.position.set(-.8,.93,.25);scene.add(cup);
+cyl(cup,M(0xf2f2f2,.5),[0,.04,0],.035,.08,null,.028);cyl(cup,M(0x3a2414,.3),[0,.077,0],.03,.004);add(cup,new THREE.TorusGeometry(.022,.005,8,14),M(0xf2f2f2,.5),[.04,.045,0],[0,0,0]);
+mkItem({id:'cup',label:'Coffee cup',kind:'toggle',extra:true,parent:scene,pos:[-.8,.99,.25],size:[.12,.15,.12],fmt:s=>s>.5?'RAISED':'ON TABLE',vis:s=>{cup.position.set(-.8+s*.27,.93+s*.28,.25+s*.2);cup.rotation.z=s*.35}});
+const visor=new THREE.Group();visor.position.set(-.45,1.84,-.62);scene.add(visor);box(visor,M(0x1c2226,.8),[0,0,.15],[.55,.012,.3]);
+mkItem({id:'visor',label:'Sun visor',kind:'toggle',extra:true,parent:scene,pos:[-.45,1.76,-.5],size:[.55,.2,.34],fmt:s=>s>.5?'DOWN':'STOWED',vis:s=>{visor.rotation.x=s*1.35}});
+const pane=new THREE.Group();pane.position.set(-.985,1.425,-.01);scene.add(pane);
+add(pane,new THREE.BoxGeometry(.012,.85,.72),M(0x9fc9e4,.1,.2,{transparent:true,opacity:.22}),[0,0,0]);box(pane,M(0x1a2125,.7),[0,-.435,0],[.03,.02,.72]);box(pane,M(0x1a2125,.7),[0,.435,0],[.03,.02,.72]);box(pane,M(0x1a2125,.7),[0,0,.35],[.03,.85,.02]);box(pane,M(0x1a2125,.7),[0,0,-.35],[.03,.85,.02]);
+box(pane,M(0xcfd7da,.4),[.03,0,-.3],[.03,.1,.04]);
+mkItem({id:'window',label:'Side window',kind:'slide',extra:true,parent:scene,pos:[-.93,1.425,.05],size:[.16,.88,1.2],gain:1.4,load:5,fmt:s=>s<.05?'CLOSED':Math.round(s*100)+'% OPEN',vis:s=>{pane.position.z=-.01+s*.62}});
+
+/* =====================================================================
+   HAND (gloved, same construction as the trainer's hand)
+   ===================================================================== */
+const hand=new THREE.Group();scene.add(hand);const HS=.75;hand.scale.setScalar(HS);const handParts=[];const REACH=.19;
+{const glove=M(0x1d2a30,.5,.1),node=new THREE.MeshBasicMaterial({color:0x35e6d0}),dk=M(0x10191d,.4,.3),h=hand;
+  sph(h,glove,[0,0,0],[.045,.018,.055]);cyl(h,glove,[0,0,.09],.033,.1,[Math.PI/2,0,0]);
+  add(h,new THREE.TorusGeometry(.036,.007,8,24),node,[0,0,.12]);box(h,dk,[0,.034,.1],[.055,.014,.045]);box(h,new THREE.MeshBasicMaterial({color:0x35e6d0}),[0,.042,.1],[.03,.002,.02]);
+  for(const x of[-.03,.03])sph(h,node,[x,.016,.01],[.006,.006,.006]);
+  const specs=[[-.034,.1,null],[-.011,.125,'index'],[.012,.135,'middle'],[.034,.115,'ring'],[.05,.09,null]];
+  for(const[x,len,key]of specs){const root=new THREE.Group();root.position.set(x,0,-.05);h.add(root);sph(root,glove,[0,0,-len*.28],[.0165,.014,len*.38]);
+    const joint=new THREE.Group();joint.position.set(0,0,-len*.55);root.add(joint);sph(joint,glove,[0,0,-len*.23],[.014,.013,len*.3]);
+    const tip=new THREE.Group();tip.position.set(0,0,-len*.48);joint.add(tip);sph(tip,glove,[0,0,-len*.15],[.012,.012,len*.22]);sph(tip,node,[0,.008,-len*.2],[.005,.005,.005]);
+    sph(root,node,[0,.012,-len*.1],[.0045,.0045,.0045]);if(key)handParts.push({key,root,joint,tip})}
+  const th=new THREE.Group();th.position.set(-.05,0,-.01);th.rotation.set(-.2,.7,0);h.add(th);sph(th,glove,[0,0,-.045],[.022,.016,.06]);
+  const tj=new THREE.Group();tj.position.set(0,0,-.085);th.add(tj);sph(tj,glove,[0,0,-.035],[.017,.014,.045]);sph(tj,node,[0,.01,-.07],[.005,.005,.005]);
+  handParts.push({key:'thumb',root:th,joint:tj,tip:tj})}
+let handSide=1;
+window.switchHand=()=>{handSide=-handSide;hand.scale.x=HS*handSide;say(handSide>0?'Right hand selected.':'Left hand selected.')};
+/* amber ring that marks the next control */
+const mark=new THREE.Mesh(new THREE.TorusGeometry(.06,.005,8,36),new THREE.MeshBasicMaterial({color:0xffb547,depthTest:false,transparent:true,opacity:.95,toneMapped:false}));mark.renderOrder=15;mark.visible=false;scene.add(mark);
+
+/* =====================================================================
+   COCKPIT SYSTEMS (simplified A320 logic)
+   ===================================================================== */
+const X={dc:false,ac:false,apu:0,apuAvail:false,starting:false,al:[0,0,0],aligned:false,n1:[0,0],n2:[0,0],run:[false,false],noStart:[0,0],gs:0,pumps:0,bleed:false,trav:0,lat:0,alt:0,pit:0,go:false,fly:false,lining:false};
+const flapsIdx=()=>Math.round(items.flaps.state*4);
+function systems(dt){
+  X.dc=I('bat1')>.5||I('bat2')>.5;
+  if(!X.dc||I('apumaster')<.5){X.apu=Math.max(0,X.apu-dt/12);X.starting=false;if(I('apustart')>.5)items.apustart.state=0}
+  else{if(I('apustart')>.5)X.starting=true;if(X.starting)X.apu=Math.min(1,X.apu+dt/12)}
+  X.apuAvail=X.apu>=.95;const apuGen=X.apuAvail&&I('apugen')>.5;
+  X.ac=I('ext')>.5||apuGen||X.run[0]||X.run[1];
+  for(let i=0;i<3;i++){const k=I('adirs'+(i+1));if(k>=1&&X.dc&&X.ac)X.al[i]=Math.min(1,X.al[i]+dt/15);else if(k<1)X.al[i]=Math.max(0,X.al[i]-dt/3)}
+  X.aligned=X.al.every(a=>a>=1)&&['adirs1','adirs2','adirs3'].every(id=>I(id)>=1);
+  X.pumps=['pumpL1','pumpL2','pumpC','pumpR1','pumpR2'].filter(id=>I(id)>.5).length;const fuelOk=X.pumps>=1&&X.dc;
+  X.bleed=X.apuAvail&&I('apubleed')>.5;const mode=I('engmode');
+  for(let e=0;e<2;e++){const master=I('eng'+(e+1))>.5,thr=items['thr'+(e+1)].state;
+    if(!master||!fuelOk){X.run[e]=false;X.n2[e]=Math.max(0,X.n2[e]-dt/(X.n2[e]>.3?14:6))}
+    else if(X.run[e]){X.n2[e]+=(.6+thr*.4-X.n2[e])*Math.min(1,dt*.8)}
+    else if(X.bleed&&(mode===2||X.n2[e]>.02)){X.n2[e]=Math.min(.6,X.n2[e]+dt/10);if(X.n2[e]>=.58)X.run[e]=true}
+    else X.n2[e]=Math.max(0,X.n2[e]-dt/10);
+    X.n1[e]=X.run[e]?X.n1[e]+((.2+thr*.78)-X.n1[e])*Math.min(1,dt*.9):X.n2[e]*.35;
+    X.noStart[e]=(master&&!X.run[e]&&X.n2[e]<.02)?X.noStart[e]+dt:0}
+  const av=(items.thr1.state+items.thr2.state)/2;if(X.lat>=1&&av>=.9)X.go=true;const mx=X.lat>=1?185:30,tgt=(X.run[0]&&X.run[1]&&I('park')<.5&&(X.lat<1||X.go))?Math.max(0,av-.08)/.92*mx:0;
+  X.gs+=(tgt-X.gs)*Math.min(1,dt*(X.lat>=1?(X.go?.12:.8):.4));X.trav+=X.gs*.514*dt;
+  strip.position.z=X.trav%12;world.position.z=X.trav%320;apronTex.offset.y=X.trav/22.5;
+  if(X.lining)X.lat=Math.min(1,X.lat+dt/8);
+  if(X.lat>=1){const st=I('stick');if(!X.fly&&X.gs>=125&&st>.25)X.fly=true;
+    if(X.fly){X.pit+=(st*.28-X.pit)*Math.min(1,dt*1.2);X.alt=Math.min(400,X.alt+Math.sin(X.pit)*X.gs*.514*dt)}}
+  const le=X.lat*X.lat*(3-2*X.lat);outside.position.set(-RX*le,-X.alt,0);outside.rotation.x=-X.pit}
+
+/* ---------- cockpit screens ---------- */
+const scrs={};
+function placeScr(name,x,y){const c=document.createElement('canvas');c.width=c.height=256;const s={c,x:c.getContext('2d'),tx:new THREE.CanvasTexture(c)};s.tx.colorSpace=THREE.SRGBColorSpace;scrs[name]=s;
+  box(MP,M(0x0a0e10,.5),[x,y,.016],[.215,.215,.012]);const m=new THREE.Mesh(new THREE.PlaneGeometry(.19,.19),new THREE.MeshBasicMaterial({map:s.tx,toneMapped:false}));m.position.set(x,y,.0235);MP.add(m)}
+placeScr('pfd1',-.68,.07);placeScr('nd1',-.44,.07);placeScr('ewd',0,.12);placeScr('sd',0,-.105);placeScr('nd2',.44,.07);placeScr('pfd2',.68,.07);
+for(const[t,x,y,w]of[['CAPT PFD',-.68,-.065,.2],['CAPT ND',-.44,-.065,.2],['E/WD',-.17,.12,.07],['SD',-.17,-.105,.07],['F/O ND',.44,-.065,.2],['F/O PFD',.68,-.065,.2]]){const m=label(MP,t,x,y,.0215,w,.03,'oh','#7fa3ad',20);m.rotation.x=0}
+box(MP,M(0x14191c,.6),[0,-.225,.012],[1.7,.05,.004]);
+for(let i=0;i<14;i++)box(MP,M(i%3?0x39444a:0x7a2a25,.5),[-.8+i*.123,-.225,.017],[.05,.02,.01]);
+const txt=(x,s,px,py,sz,col,al='left')=>{x.fillStyle=col;x.font=`600 ${sz}px sans-serif`;x.textAlign=al;x.fillText(s,px,py)};
+const alignPct=()=>(X.al[0]+X.al[1]+X.al[2])/3*100|0;
+function drawPFD(s){const x=s.x;x.fillStyle='#000';x.fillRect(0,0,256,256);const bob=Math.sin(t*.6)*2;
+  if(X.aligned){x.save();x.beginPath();x.rect(44,28,168,200);x.clip();x.translate(128,128+bob+X.pit*220);x.fillStyle='#2f7fd4';x.fillRect(-120,-160,240,160);x.fillStyle='#8b5a2b';x.fillRect(-120,0,240,160);x.fillStyle='#fff';x.fillRect(-120,-1,240,2);x.restore()}
+  else{x.fillStyle='#10161a';x.fillRect(44,28,168,200);txt(x,'ATT',128,120,24,'#ff5d4d','center');txt(x,`ALIGN ${alignPct()}%`,128,150,15,'#ffb547','center')}
+  x.fillStyle='#1c262c';x.fillRect(4,28,36,200);x.fillRect(216,28,36,200);x.strokeStyle='#fff';x.lineWidth=2;x.strokeRect(4,28,36,200);x.strokeRect(216,28,36,200);
+  txt(x,X.aligned?String(Math.round(X.gs)):'SPD',22,134,X.aligned?18:13,X.aligned?'#fff':'#ff5d4d','center');txt(x,X.aligned?String(Math.round(X.alt*3.28)):'ALT',234,134,X.aligned?18:13,X.aligned?'#fff':'#ff5d4d','center');
+  x.strokeStyle='#ffd23f';x.lineWidth=4;x.beginPath();x.moveTo(84,128);x.lineTo(112,128);x.lineTo(112,138);x.moveTo(172,128);x.lineTo(144,128);x.lineTo(144,138);x.stroke();
+  txt(x,'F '+FLN[flapsIdx()],8,20,14,'#35e65a');x.fillStyle='#1c262c';x.fillRect(44,230,168,22);txt(x,X.aligned?'HDG  270°':'HDG',128,247,15,X.aligned?'#fff':'#ff5d4d','center')}
+function drawND(s){const x=s.x;x.fillStyle='#000';x.fillRect(0,0,256,256);const cx=128,cy=200,R=112;x.strokeStyle='#fff';x.lineWidth=2;x.beginPath();x.arc(cx,cy,R,Math.PI*1.12,Math.PI*1.88);x.stroke();
+  for(let i=-6;i<=6;i++){const a=-Math.PI/2+i*.09,l=i%3===0?14:7;x.beginPath();x.moveTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);x.lineTo(cx+Math.cos(a)*(R-l),cy+Math.sin(a)*(R-l));x.stroke()}
+  x.strokeStyle='#35e6d0';x.beginPath();x.arc(cx,cy,R*.55,Math.PI*1.15,Math.PI*1.85);x.stroke();x.fillStyle='#ffd23f';x.beginPath();x.moveTo(cx,cy-18);x.lineTo(cx-10,cy+6);x.lineTo(cx+10,cy+6);x.fill();
+  if(X.aligned)txt(x,'270',128,38,22,'#35e6d0','center');else txt(x,'HDG',128,40,20,'#ff5d4d','center');txt(x,`GS ${Math.round(X.gs)}`,10,24,14,'#fff');txt(x,'ARPT',246,24,14,'#35e6d0','right')}
+function drawEWD(s){const x=s.x;x.fillStyle='#000';x.fillRect(0,0,256,256);
+  for(let e=0;e<2;e++){const cx=62+e*132,n1=X.n1[e];x.lineWidth=7;x.strokeStyle='#33414a';x.beginPath();x.arc(cx,78,40,Math.PI*.8,Math.PI*2.2);x.stroke();
+    x.strokeStyle=X.run[e]?'#35e65a':'#9aa';x.beginPath();x.arc(cx,78,40,Math.PI*.8,Math.PI*(.8+1.4*Math.max(.01,n1)));x.stroke();
+    txt(x,String(Math.round(n1*100)),cx,86,24,'#35e65a','center');txt(x,'N1 %',cx,26,13,'#9fb2b8','center');txt(x,`N2 ${Math.round(X.n2[e]*100)}`,cx,138,15,'#fff','center');txt(x,`EGT ${Math.round(300+X.n2[e]*320*(X.run[e]?1:.6))}`,cx,158,13,'#35e6d0','center')}
+  const memo=[];memo.push(`AC BUS ${X.ac?'ON':'OFF'}`);if(X.apuAvail)memo.push('APU AVAIL');if(I('park')>.5)memo.push('PARK BRK');if(I('beacon')>.5)memo.push('BEACON ON');if(X.pumps)memo.push(`FUEL PUMPS ${X.pumps}/5`);if(X.aligned)memo.push('IRS ALIGNED');
+  memo.slice(0,5).forEach((m,i)=>txt(x,m,14,182+i*14,12,i?'#35e65a':'#ffb547'));txt(x,'FLAPS '+FLN[flapsIdx()],242,250,13,'#fff','right')}
+function drawSD(s){const x=s.x;x.fillStyle='#000';x.fillRect(0,0,256,256);txt(x,X.apu>0?'APU':'ELEC',128,22,16,'#35e6d0','center');
+  const rows=[[`BAT 1  ${I('bat1')>.5?'28.4 V':'OFF'}`,I('bat1')>.5],[`BAT 2  ${I('bat2')>.5?'28.4 V':'OFF'}`,I('bat2')>.5],[`EXT PWR  ${I('ext')>.5?'115 V':'AVAIL'}`,I('ext')>.5],[`APU  N ${Math.round(X.apu*100)}%`,X.apuAvail],[`APU GEN  ${X.apuAvail&&I('apugen')>.5?'ON':'OFF'}`,X.apuAvail&&I('apugen')>.5],[`ADIRS  ${alignPct()}%`,X.aligned]];
+  rows.forEach(([r,ok],i)=>txt(x,r,18,56+i*24,15,ok?'#35e65a':'#ffb547'));x.strokeStyle='#33414a';x.lineWidth=2;x.strokeRect(18,206,220,16);x.fillStyle=X.apuAvail?'#35e65a':'#ffb547';x.fillRect(19,207,218*X.apu,14)}
+let scrT=0;
+function drawScreens(){for(const[n,s]of Object.entries(scrs)){if(!X.dc){s.x.fillStyle='#050708';s.x.fillRect(0,0,256,256)}
+  else if(n.startsWith('pfd'))drawPFD(s);else if(n.startsWith('nd'))drawND(s);else if(n==='ewd')drawEWD(s);else drawSD(s);s.tx.needsUpdate=true}}
+
+/* ---------- audio ---------- */
+let au=null;
+function initAudio(){if(au){if(au.c.state==='suspended')au.c.resume();return}if(!window.AudioContext)return;
+  try{const c=new AudioContext(),len=c.sampleRate*2,b=c.createBuffer(1,len,c.sampleRate),d=b.getChannelData(0);let last=0;for(let i=0;i<len;i++){last=(last+.02*(Math.random()*2-1))/1.02;d[i]=last*3.5}
+    const nz=(type,f,q)=>{const s=c.createBufferSource();s.buffer=b;s.loop=true;const fl=c.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;const g=c.createGain();g.gain.value=0;s.connect(fl).connect(g).connect(c.destination);s.start();return{f:fl,g}};
+    const os=type=>{const o=c.createOscillator();o.type=type;const g=c.createGain();g.gain.value=0;o.connect(g).connect(c.destination);o.start();return{o,g}};
+    au={c,eng:nz('lowpass',300,.7),wind:nz('bandpass',900,.5),amb:nz('lowpass',400,.7),whine:os('sawtooth'),apu:os('triangle'),elec:os('sine')}}catch(e){au=null}}
+function beep(f=880,len=.06,vol=.05,type='sine'){if(!au)return;const c=au.c,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=f;g.gain.value=vol;o.connect(g).connect(c.destination);o.start();o.stop(c.currentTime+len)}
+const chime=()=>{beep(784,.35,.07);setTimeout(()=>beep(1046,.45,.07),230)};
+function updateAudio(){if(!au)return;const c=au.c,tt=c.currentTime,open=I('window'),n2=(X.n2[0]+X.n2[1])/2,k=.25;
+  au.amb.g.gain.setTargetAtTime(.06*(.3+open*1.4),tt,k);au.amb.f.frequency.setTargetAtTime(350+open*2600,tt,k);au.wind.g.gain.setTargetAtTime(open*.045,tt,k);
+  au.eng.g.gain.setTargetAtTime(n2*.45*(.35+open*.65),tt,k);au.eng.f.frequency.setTargetAtTime(140+n2*420+open*300,tt,k);
+  au.whine.o.frequency.setTargetAtTime(260+n2*900,tt,k);au.whine.g.gain.setTargetAtTime(n2*.01*(.4+open*.6),tt,k);
+  au.apu.o.frequency.setTargetAtTime(180+X.apu*520,tt,k);au.apu.g.gain.setTargetAtTime(X.apu*.012,tt,k);
+  au.elec.o.frequency.value=400;au.elec.g.gain.setTargetAtTime(X.ac?.004:0,tt,k)}
+
+/* =====================================================================
+   PROCEDURE (cold & dark -> taxi)
+   ===================================================================== */
+const GROUPS=['Electrical power-up','Systems alignment (ADIRS)','APU and bleed','Flight preparation','Engine start','Before taxi','Takeoff'];
+const tasks=[];const T=(g,label,cue,check,pick,dwell=.4)=>tasks.push({g,label,cue,check,pick:pick||(()=>null),dwell,t:0});
+const on=(id,v=1)=>[()=>I(id)===v,()=>I(id)===v?null:id];
+const geN=(id,n)=>[()=>I(id)>=n,()=>I(id)>=n?null:id];
+function buildTasks(){tasks.length=0;
+  T(0,'BAT 1 ON','Press view 2 (Overhead). Hover the BAT 1 pushbutton until it outlines, then click / close your fist: the OFF light goes out.',...on('bat1'));
+  T(0,'BAT 2 ON','Same for BAT 2. Pause on the button first: presses are ignored until you have hovered for a moment.',...on('bat2'));
+  T(0,'EXT PWR ON','Ground power shows AVAIL (green). Push EXT PWR to connect it: the AC buses come alive.',...on('ext'));
+  T(1,'ADIRS 1 → NAV','Turn IR 1 from OFF to NAV: click the knob to step it, or grab and drag sideways.',...geN('adirs1',1));
+  T(1,'ADIRS 2 → NAV','IR 2 to NAV.',...geN('adirs2',1));T(1,'ADIRS 3 → NAV','IR 3 to NAV.',...geN('adirs3',1));
+  T(1,'Wait for alignment','ADIRS aligning (demo ≈ 15 s instead of ≈ 10 min). Press 1 to watch the PFD flags clear.',()=>X.aligned,null,.2);
+  T(2,'APU MASTER ON','Push APU MSTR (overhead, right).',...on('apumaster'));
+  T(2,'APU START','Push APU START. The APU spools up on the SD page.',...on('apustart'));
+  T(2,'Wait: APU AVAIL','Wait for APU AVAIL (≈ 12 s).',()=>X.apuAvail,null,.2);
+  T(2,'APU GEN ON','Push APU GEN so the APU supplies electrical power.',...on('apugen'));
+  T(2,'APU BLEED ON','Push APU BLEED: air for engine start.',...on('apubleed'));
+  const pumps=['pumpL1','pumpL2','pumpC','pumpR1','pumpR2'];
+  T(3,'Fuel pumps ON','Push every FUEL PUMP button (L1, L2, CTR, R1, R2).',()=>pumps.every(p=>I(p)>.5),()=>pumps.find(p=>I(p)<.5)||null);
+  T(3,'BEACON ON','Flip the BEACON switch (EXT LT, overhead lower left).',...on('beacon'));
+  T(3,'Flaps -> 1','Press 3 (Pedestal). Grab the flaps lever and drag it up one detent to position 1.',()=>flapsIdx()===1,()=>flapsIdx()===1?null:'flaps');
+  T(4,'ENG MODE → IGN','Pedestal: click the ENG MODE selector once (NORM → IGN/START) or drag it sideways.',...on('engmode',2));
+  T(4,'ENG 2 MASTER ON','Flip ENG 2 master switch up.',...on('eng2'));
+  T(4,'Wait: ENG 2 idle','Engine 2 is starting. Wait for stable idle (see E/WD).',()=>X.run[1],null,.2);
+  T(4,'ENG 1 MASTER ON','Flip ENG 1 master switch up.',...on('eng1'));
+  T(4,'Wait: ENG 1 idle','Engine 1 is starting. Wait for stable idle.',()=>X.run[0],null,.2);
+  T(4,'ENG MODE → NORM','Return the ENG MODE selector to NORM (click: it steps back from IGN).',...on('engmode',1));
+  T(5,'NAV & LOGO ON','Flip NAV&LOGO (EXT LT, overhead).',...on('navlogo'));
+  T(5,'Release PARK BRK','Pedestal: move the red PARK BRK lever to RELEASED.',...on('park',0));
+  const okT=id=>items[id].state>.12&&items[id].state<.55;
+  T(5,'Taxi thrust','Press 3 (Pedestal). Grab either THR lever (both move together) and drag up to about 30 %, or scroll the mouse wheel over it. Hold: the airport starts to roll past.',()=>okT('thr1')&&okT('thr2'),()=>okT('thr1')&&okT('thr2')?null:'thr1',1.5);
+  T(6,'Line up on runway','Keep the throttles where they are. The aircraft turns onto the runway and stops on the centre line (about 8 s). Press 5 to watch.',()=>{X.lining=true;return X.lat>=1},null,.5);
+  T(6,'TOGA thrust','Press 3 (Pedestal). Push both throttles all the way forward to TOGA and hold: the aircraft accelerates down the runway.',()=>items.thr1.state>=.97&&items.thr2.state>=.97,()=>items.thr1.state>=.97?null:'thr1',.6);
+  T(6,'Accelerate to 140 kt','Keep TOGA. Watch SPD on the left PFD. Rotate at 140 kt.',()=>X.gs>=138,null,.1);
+  T(6,'Rotate: pull back','At 140 kt pull the captain sidestick back: press 6, hold the button on the stick and drag the mouse DOWN (or scroll DOWN over it). Keep it back.',()=>X.fly,()=>X.fly?null:'stick',.3);
+  T(6,'Climb away','Keep the sidestick back (about 50 %) and TOGA. Climb to 100 m: the runway drops away below you.',()=>X.alt>=100,()=>null,.2)}
+let ti=0,t=0,elapsed=0,accSum=0,accN=0,pen=0,finished=false,pathD=0,guardT=0,warnT=0,warnMsg='',lastAct='';
+const stepEls=[];$('steps').innerHTML=GROUPS.map(g=>`<li>${g}</li>`).join('');stepEls.push(...$('steps').children);
+window.restart=()=>{ti=0;elapsed=0;accSum=accN=pen=0;finished=false;pathD=0;grab=null;hov=null;
+  for(const it of itemList){it.state=it.shown=it.init;it.dir=1}
+  Object.assign(X,{dc:false,ac:false,apu:0,apuAvail:false,starting:false,al:[0,0,0],aligned:false,n1:[0,0],n2:[0,0],run:[false,false],noStart:[0,0],gs:0,trav:0,lat:0,alt:0,pit:0,go:false,fly:false,lining:false});
+  buildTasks();ui(true)};
+window.releaseHeldItem=()=>{if(grab){endGrab(true);say('Control released.')}};
+
+/* =====================================================================
+   INPUT: pointer / glove -> filtered cursor -> hover dwell -> grab
+   ===================================================================== */
+const mouse={u:0,v:0,ui:false},cur={u:0,v:0},down={l:false,r:false};let gripS=0,gOn=false,hov=null,hovT=0,lostT=0,grab=null,g0=null,lockT=0,live=false;
+addEventListener('pointermove',e=>{mouse.u=clamp(e.clientX/innerWidth*2-1,-1,1);mouse.v=clamp(-(e.clientY/innerHeight*2-1),-1,1);mouse.ui=!!e.target.closest('button,aside,input,#bp')});
+addEventListener('pointerdown',e=>{initAudio();if(e.target.closest('button,aside,input,#bp,summary'))return;if(e.button===2)down.r=true;else down.l=true});
+addEventListener('pointerup',()=>{down.l=down.r=false});addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('wheel',e=>{if(e.target.closest&&e.target.closest('aside,#bp'))return;const it=grab||hov;if(it&&it.link){e.preventDefault();const v=clamp(it.state-e.deltaY*.0008,0,1);it.state=v;items[it.link].state=v}else if(it&&it.n&&it.kind==='lever'){e.preventDefault();if(!it.wt||performance.now()-it.wt>180){it.wt=performance.now();it.state=clamp(Math.round(it.state*(it.n-1))+(e.deltaY<0?1:-1),0,it.n-1)/(it.n-1)}}else if(it&&it.id==='stick'){e.preventDefault();it.state=clamp(it.state+e.deltaY*.0008,0,1)}},{passive:false});
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.target.closest&&e.target.closest('input'))return;
+  if(e.code==='Tab'){e.preventDefault();switchHand()}if(e.code==='Space')e.preventDefault();if(e.code==='KeyR')restart();if(e.code==='KeyH')document.body.classList.toggle('nohud');if(e.code==='KeyC')centerGlove();
+  {const vk={Digit1:1,Digit2:2,Digit3:3,Digit4:4,Digit5:5,Numpad5:5,Digit6:6,Numpad6:6,Numpad1:1,Numpad2:2,Numpad3:3,Numpad4:4}[e.code];if(vk)setView(vk)}if(e.code.startsWith('Arrow'))e.preventDefault()});
+addEventListener('keyup',e=>{keys[e.code]=false});addEventListener('blur',()=>{for(const k in keys)keys[k]=false;down.l=down.r=false});
+
+const rc=new THREE.Raycaster();rc.far=3.5;const targets=[...proxies,...SURF],v2=new THREE.Vector2(),dirV=new THREE.Vector3(),tmpV=new THREE.Vector3(),tmpR=new THREE.Vector3(),tmpU=new THREE.Vector3(),tmpW=new THREE.Vector3(),aimV=new THREE.Vector3(),hitPt=new THREE.Vector3();let hasHit=false,prevHit=null;
+const vib=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+const warn=(m,s=1.2)=>{warnMsg=m;warnT=s};
+function beginGrab(it){grab=it;g0={u:cur.u,v:cur.v,state:it.state,moved:0};
+  const rel=it.extra||(it.grp!==undefined&&ti<tasks.length&&it.grp<=tasks[ti].g)||finished;if(!it.extra){accN++;if(rel)accSum++}
+  if(it.kind==='toggle'){it.state=1-it.state;beep(it.state?900:640,.05);vib(14);lastAct=`${it.label} ${it.fmt(it.state)}`}
+  else if(it.kind==='momentary'){it.state=1;it.pressT=t;beep(900,.04);vib(14);chime()}
+  else{beep(520,.03,.03);vib(8)}}
+function endGrab(force){const it=grab;if(!it)return;
+  if(it.kind==='knob'&&!force&&g0.moved<.05&&it.state===g0.state){let s=it.state+it.dir;if(s>it.n-1||s<0){it.dir=-it.dir;s=it.state+it.dir}it.state=s;beep(760,.04);vib(12)}
+  if(it.kind==='lever'&&it.n&&!force&&it.state===g0.state&&Math.abs(cur.v-g0.v)<.03){let k=Math.round(it.state*(it.n-1))+it.dir;if(k>it.n-1||k<0){it.dir=-it.dir;k=Math.round(it.state*(it.n-1))+it.dir}it.state=k/(it.n-1);beep(600,.04);vib(12)}
+  if(it.kind==='knob'||it.kind==='lever'||it.kind==='slide')lastAct=`${it.label} ${it.fmt(it.state)}`;
+  grab=null;lockT=.15}
+function dragGrab(){const it=grab,du=cur.u-g0.u,dv=cur.v-g0.v;
+  if(it.kind==='knob'){g0.moved=Math.max(g0.moved,Math.abs(du));const s=clamp(Math.round(g0.state+du/.14),0,it.n-1);if(g0.moved>.05&&s!==it.state){it.state=s;beep(700+s*60,.03);vib(10)}}
+  else if(it.kind==='lever'){let raw=clamp(g0.state+dv*it.gain,0,1);if(it.n)raw=Math.round(raw*(it.n-1))/(it.n-1);else if(it.snaps)for(const d of it.snaps)if(Math.abs(raw-d)<.03)raw=d;
+    if(raw!==it.state){if(it.n||(it.snaps&&it.snaps.includes(raw)))if(Math.abs(raw-it.state)>0){beep(it.n?600:480,.025,.03);vib(8)}it.state=raw;if(it.link)items[it.link].state=raw}}
+  else if(it.kind==='slide'){it.state=clamp(g0.state+du*it.gain,0,1)}}
+
+function inputStep(dt){
+  const A=gloveTilt&&gloveNeutralTilt;live=connected&&performance.now()-lastPacketAt<1500&&A;let tu,tv,g;
+  if(live){tu=clamp((gloveTilt.roll-gloveNeutralTilt.roll)/.7,-1,1);tv=clamp(-(gloveTilt.pitch-gloveNeutralTilt.pitch)/.7,-1,1);g=gloveGripValue()}
+  else{tu=mouse.u;tv=mouse.v;g=(down.l||down.r||keys.Space)?1:0}
+  /* adaptive low-pass (One-Euro style): slow motion is heavily smoothed (kills jitter), fast motion stays responsive */
+  const sp=Math.hypot(tu-cur.u,tv-cur.v)/Math.max(dt,.001),rate=live?clamp(5+sp*14,5,40):40,kk=1-Math.exp(-rate*dt);
+  cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;gripS+=(g-gripS)*(1-Math.exp(-dt*18));
+  rc.setFromCamera(v2.set(cur.u*(isVR?.25:1),cur.v*(isVR?.25:1)),cam);dirV.copy(rc.ray.direction);
+  const hits=rc.intersectObjects(targets,false);let cand=null;hasHit=false;
+  if(hits.length){hitPt.copy(hits[0].point);hasHit=true;for(const h of hits)if(h.object.userData.item){cand=h.object.userData.item;break}}
+  if(!grab){
+    if(cand&&cand!==hov){hov=cand;hovT=0;lostT=0}else if(cand){hovT+=dt;lostT=0}
+    else if(hov){lostT+=dt;if(lostT>.18){hov=null;hovT=0}}}
+  lockT=Math.max(0,lockT-dt);guardT=Math.max(0,guardT-dt);
+  const was=gOn;if(!gOn&&gripS>.55)gOn=true;else if(gOn&&gripS<.3)gOn=false;
+  if(gOn&&!was){const need=live?.15:.06;
+    if(!grab&&lockT<=0&&hov&&hovT>=need)beginGrab(hov);
+    else if(!grab&&hov&&hovT<need){guardT=.9;warn('Press ignored: hover on the control first',1)}}
+  if(!gOn&&was&&grab)endGrab(false);
+  if(grab)dragGrab();
+  if(hasHit&&prevHit){pathD+=prevHit.distanceTo(hitPt)}prevHit=hasHit?(prevHit||new THREE.Vector3()).copy(hitPt):null;
+  for(const it of itemList){it.ol.visible=it===hov;it.ol.material.opacity=grab===it?1:.8}
+  for(const it of itemList)if(it.kind==='momentary'&&it.state===1&&t-it.pressT>.3)it.state=0;
+  /* hand placement: fingertip on the hit point, palm behind it */
+  const rt=tmpR.set(1,0,0).applyQuaternion(cam.quaternion),up=tmpU.set(0,1,0).applyQuaternion(cam.quaternion),tp=tmpV;
+  if(hasHit)tp.copy(hitPt).addScaledVector(dirV,-REACH+(gOn?.012:0)).addScaledVector(rt,.07*handSide).addScaledVector(up,-.07);
+  else tp.copy(cam.position).addScaledVector(dirV,.55).addScaledVector(rt,.2*handSide).addScaledVector(up,-.24); /* resting pose: low and to the side, view stays clear */
+  hand.position.lerp(tp,1-Math.exp(-dt*22));aimV.copy(hasHit?hitPt:tmpW.copy(cam.position).addScaledVector(dirV,2)).sub(hand.position);hand.lookAt(hand.position.clone().sub(aimV))}
+
+/* =====================================================================
+   VIEW: look presets, edge look, movement, gyro, VR box
+   ===================================================================== */
+const look={yaw:0,pitch:-.12,goal:null};
+const VIEWS={1:{yaw:-.12,pitch:-.2},2:{yaw:-.6,pitch:.8},3:{yaw:-.72,pitch:-.66},4:{yaw:.85,pitch:.1},5:{yaw:-.55,pitch:-.06}};
+window.setView=n=>{
+  if(gyroEnabled&&gotOrientation){if(n===3)cam.position.set(-.12,1.22,.3);else cam.position.copy(HOME);say(n===3?'Moved next to the pedestal: look down at the throttles and flaps lever.':'Gyro is on: look around by turning your head.');return}
+  if(n===3||n===6){const tg=n===3?[.03,.92,.1]:[-.8,1.1,.45],p=cam.position,dx=tg[0]-p.x,dy=tg[1]-p.y,dz=tg[2]-p.z;look.goal={yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz))}} /* aims at the throttle + flaps levers from wherever you stand */
+  else look.goal=VIEWS[n]};
+function applyLook(dt){
+  if(gyroEnabled&&gotOrientation)return;
+  const lk=(keys.ArrowLeft?1:0)-(keys.ArrowRight?1:0),up=(keys.ArrowUp?1:0)-(keys.ArrowDown?1:0);
+  if(lk||up){look.goal=null;look.yaw+=lk*dt*1.4;look.pitch=clamp(look.pitch+up*dt*1.1,-1.2,1.35)}
+  else if(look.goal){const k=1-Math.exp(-dt*5);look.yaw+=(look.goal.yaw-look.yaw)*k;look.pitch+=(look.goal.pitch-look.pitch)*k}
+  else if(!grab&&!mouse.ui&&!live){const eu=Math.abs(cur.u)>.9?(Math.abs(cur.u)-.9)/.1*Math.sign(cur.u):0,ev=Math.abs(cur.v)>.9?(Math.abs(cur.v)-.9)/.1*Math.sign(cur.v):0;
+    look.yaw-=eu*dt*.9;look.pitch=clamp(look.pitch+ev*dt*.7,-1.2,1.35)}
+  cam.rotation.set(look.pitch,look.yaw,0)}
+function moveCamera(dt){
+  const f=Number(!!keys.KeyW)-Number(!!keys.KeyS),s2=Number(!!keys.KeyD)-Number(!!keys.KeyA);if(!f&&!s2)return;
+  const d=V(s2,0,-f).normalize().applyAxisAngle(Y,cam.rotation.y).multiplyScalar(.8*dt);
+  cam.position.x=clamp(cam.position.x+d.x,-.78,-.08);cam.position.z=clamp(cam.position.z+d.z,.2,.85)}
+let isVR=false,gyroEnabled=false,gotOrientation=false,recenterPending=false;
+const D2R=Math.PI/180,yawFix=new THREE.Quaternion(),deviceQ=new THREE.Quaternion(),tmpEuler=new THREE.Euler(),qBack=new THREE.Quaternion(-Math.SQRT1_2,0,0,Math.SQRT1_2);
+const stereo=new THREE.StereoCamera();stereo.aspect=.5;stereo.eyeSep=.064;
+const eyeRT=new THREE.WebGLRenderTarget(512,512);
+const distMat=new THREE.ShaderMaterial({uniforms:{t:{value:eyeRT.texture},k:{value:.25},sx:{value:0}},
+  vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
+  fragmentShader:['uniform sampler2D t;uniform float k;uniform float sx;varying vec2 v;','void main(){vec2 c=v*2.-1.;vec2 d=c*(1.+k*dot(c,c));vec2 u=d*.5+.5+vec2(sx,0.);','gl_FragColor=(u.x<0.||u.x>1.||u.y<0.||u.y>1.)?vec4(0.,0.,0.,1.):texture2D(t,u);','#include <tonemapping_fragment>','#include <colorspace_fragment>','}'].join('\n')});
+const qScene=new THREE.Scene();qScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),distMat));const qCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+function resize(){cam.aspect=innerWidth/innerHeight;cam.fov=isVR?90:70;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)}
+function renderRoom(){
+  if(!isVR){ren.setViewport(0,0,innerWidth,innerHeight);ren.setScissorTest(false);ren.render(scene,cam);return}
+  const w=Math.floor(innerWidth/2),h=innerHeight,pr=ren.getPixelRatio();
+  eyeRT.setSize(Math.max(2,w*pr),Math.max(2,h*pr));cam.updateMatrixWorld();stereo.update(cam);
+  distMat.uniforms.k.value=Number($('lens').value)/100*.5;const off=(Number($('align').value)-5)*.012;
+  [stereo.cameraL,stereo.cameraR].forEach((c,i)=>{
+    ren.setRenderTarget(eyeRT);ren.render(scene,c);ren.setRenderTarget(null);
+    distMat.uniforms.sx.value=i?-off:off;ren.setScissorTest(true);ren.setViewport(i*w,0,w,h);ren.setScissor(i*w,0,w,h);ren.render(qScene,qCam)});
+  ren.setScissorTest(false)}
+function onOrientation(event){
+  if(!gyroEnabled||event.alpha==null)return;gotOrientation=true;
+  const orientation=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*D2R;
+  tmpEuler.set((event.beta||0)*D2R,(event.alpha||0)*D2R,-(event.gamma||0)*D2R,'YXZ');
+  deviceQ.setFromEuler(tmpEuler).multiply(qBack).multiply(new THREE.Quaternion().setFromAxisAngle(Z,-orientation));
+  if(recenterPending){yawFix.setFromAxisAngle(Y,-tmpEuler.setFromQuaternion(deviceQ,'YXZ').y);recenterPending=false}
+  cam.quaternion.copy(yawFix).multiply(deviceQ)}
+window.recenter=()=>{recenterPending=true};
+window.resetPosition=()=>{cam.position.copy(HOME);look.yaw=0;look.pitch=-.12;look.goal=null;recenterPending=true};
+window.startTraining=()=>{restart();$('ui').classList.add('closed')};
+window.enableGyro=async()=>{
+  if(gyroEnabled)return;const O=window.DeviceOrientationEvent;
+  if(O&&typeof O.requestPermission==='function'){try{const p=await O.requestPermission();if(p!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
+  gyroEnabled=true;gotOrientation=false;recenterPending=true;$('gyroBtn').textContent='Gyro: ON';
+  setTimeout(()=>{if(!gotOrientation){gyroEnabled=false;$('gyroBtn').textContent='Enable gyro';say('No device orientation data received. Use a motion-enabled phone over HTTPS, or the arrow keys / WASD.')}},1800)};
+window.toggleVRBox=async()=>{
+  isVR=!isVR;document.body.classList.toggle('vr',isVR);resize();
+  if(isVR&&!gyroEnabled)await window.enableGyro();
+  if(isVR){setTimeout(()=>{recenterPending=true},3000);try{await document.documentElement.requestFullscreen()}catch(e){}try{await screen.orientation.lock('landscape')}catch(e){}}
+  else{try{if(document.fullscreenElement)await document.exitFullscreen()}catch(e){}try{screen.orientation.unlock()}catch(e){}}};
+addEventListener('deviceorientation',onOrientation);addEventListener('resize',()=>resize());
+document.querySelectorAll('.move-btn').forEach(b=>{const k=b.dataset.key,stop=()=>{keys[k]=false};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,stop))});
+
+/* =====================================================================
+   FRAME LOOP + HUD
+   ===================================================================== */
+const accuracy=()=>clamp((accN?accSum/accN*100:100)-pen,0,100);
+const fmt=s=>`${s/60|0}:${String(s%60|0).padStart(2,'0')}`;
+function taskStep(dt){
+  const tk=tasks[ti];let target=null;
+  if(tk&&!finished){const ok=tk.check();target=tk.pick();tk.t=ok?tk.t+dt:Math.max(0,tk.t-dt);
+    if(tk.t>=tk.dwell){ti++;beep(1200,.09,.05);vib(25);if(ti>=tasks.length){finished=true}}}
+  if(target&&items[target]){const it=items[target];it.px.getWorldPosition(tmpV);mark.visible=true;mark.position.copy(tmpV);mark.lookAt(cam.position);
+    const r=Math.max(...it.px.geometry.parameters.width?[it.px.geometry.parameters.width,it.px.geometry.parameters.depth]:[.08])*.75;mark.scale.setScalar(clamp(r/.06,.9,2.2)*(1+.12*Math.sin(t*6)))}
+  else mark.visible=false}
+function frame(dt){
+  t+=dt;if(!finished)elapsed+=dt;moveCamera(dt);applyLook(dt);cam.updateMatrixWorld(true);
+  inputStep(dt);systems(dt);
+  for(const it of itemList){it.shown+=(it.state-it.shown)*Math.min(1,dt*14);if(it.vis)it.vis(it.shown,it)}
+  const k=Math.min(1,dt*14);for(const p of handParts){let b;
+    if(live){const m=normalizeSensor(p.key,sensorValue(p.key));b=m===null?0:m}
+    else b=({thumb:.3+gripS*.4,index:gripS*.7,middle:.7+gripS*.25,ring:.75+gripS*.2})[p.key];
+    p.root.rotation.x+=(-b*.85-p.root.rotation.x)*k;p.joint.rotation.x+=(-b*.95-p.joint.rotation.x)*k;if(p.tip!==p.joint)p.tip.rotation.x+=(-b*.4-p.tip.rotation.x)*k}
+  taskStep(dt);
+  if(gripS>.9&&grab)pen+=dt*.4*(gripS>.97?1:0);
+  if(!X.run[0]&&!X.run[1]&&items.thr1.state>.5&&false)pen+=0;
+  dome.intensity=X.dc?4.5:.8;glowMP.intensity=X.dc?2.4:0;glowOH.intensity=X.dc?1.8:.15;{const lv=X.dc?1:.3;for(const m of lbls)m.material.color.setScalar(lv)}
+  scrT+=dt;if(scrT>.16){scrT=0;drawScreens()}
+  if(Math.floor(t*8)!==Math.floor((t-dt)*8))ui(false);
+  updateAudio();warnT=Math.max(0,warnT-dt);
+  renderRoom()}
+function ui(force){
+  const tk=tasks[ti],gi=finished?GROUPS.length:tk?tk.g:0;
+  if(force||ui.g!==gi){ui.g=gi;stepEls.forEach((e,i)=>e.className=i<gi?'done':i===gi?'cur':'')}
+  const lab=tk&&!finished?tk.label:'';if(force||ui.l!==lab||ui.gg!==gi){ui.l=lab;ui.gg=gi;stepEls.forEach((e,i)=>e.innerHTML=GROUPS[i]+(i===gi&&lab?`<br><small style="color:var(--amber)">▸ ${lab}</small>`:''))}
+  $('acc').textContent=accuracy()|0;
+  if(tk&&!finished)say(`${tk.label}: ${tk.cue}`);else if(finished)say(`Airborne in ${fmt(elapsed)} with ${accuracy()|0}% accuracy. Press Restart to repeat.`);
+  const gp=gripS*30,ld=grab?grab.load*(.6+gripS*.4):0;$('f0').textContent=gp.toFixed(1)+' N';$('b0').style.width=clamp(gp/30*100,0,100)+'%';$('b0').className=gp>26?'hot':'';
+  $('f1').textContent=ld.toFixed(1)+' N';$('b1').style.width=clamp(ld/16*100,0,100)+'%';
+  fingerKeys.forEach((k,i)=>{const r=sensorValue(k),n=r===null?0:normalizeSensor(k,r);$('v'+i).textContent=r===null?'—':`${Math.round(r)} / ${Math.round(n*100)}%`;$('s'+i).style.width=n*100+'%'});
+  $('tm').textContent=fmt(elapsed);$('pth').textContent=pathD.toFixed(1)+' m';
+  let w=warnT>0?warnMsg:'';
+  for(let e=0;e<2;e++)if(!w&&X.noStart[e]>4)w=`ENG ${e+1}: no start. Need APU BLEED ON, ENG MODE IGN, fuel pump ON.`;
+  if(!w&&gripS>.95)w='Squeezing too hard';
+  if(!w&&I('park')>.5&&(items.thr1.state>.3||items.thr2.state>.3)&&X.run[0]&&X.run[1])w='Parking brake is set';
+  if(!w&&tk&&tk.label==='Taxi thrust'&&items.thr1.state>=.55)w='Too much thrust: pull the throttle back to about 30 %';if(!w&&X.lat>=1&&!X.fly&&I('stick')>.3&&X.gs<120)w='Too early: wait for 140 kt before rotating';$('warn').textContent=w;
+  $('tool').textContent=`${handSide>0?'Right':'Left'} hand · ${grab?'holding '+grab.label+' ('+grab.fmt(grab.state)+')':hov?hov.label+' · '+hov.fmt(hov.state)+(hovT<(live?.15:.06)?' …':' ✓'):lastAct||'point at a control'}`}
+
+scene.updateMatrixWorld(true);resize();restart();
+const clock=new THREE.Clock();
+ren.setAnimationLoop(()=>{try{frame(Math.min(clock.getDelta(),.05))}catch(err){console.error(err);say('Runtime error: '+err.message)}});
+addEventListener('beforeunload',()=>{if(pollController)pollController.abort()});
+</script></body></html>
