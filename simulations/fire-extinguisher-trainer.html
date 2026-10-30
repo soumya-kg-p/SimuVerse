@@ -101,7 +101,7 @@ try{THREE=await loadFirst(['./three.module.js','https://cdn.jsdelivr.net/npm/thr
 catch(e){fatal(e.message);throw e}
 try{VRButton=(await loadFirst(['./VRButton.js','https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/VRButton.js','https://unpkg.com/three@0.160.0/examples/jsm/webxr/VRButton.js'])).VRButton}catch(e){console.warn('VRButton unavailable; desktop/mouse mode only')}
 const $=window.$=id=>document.getElementById(id),clamp=THREE.MathUtils.clamp,rnd=Math.random;
-var vrText='',lookDownT=0,endT=0,lastCtl=null;const say=t=>{$('cue').textContent=t;vrText=t},V=(x,y,z)=>new THREE.Vector3(x,y,z);
+var vrText='',lookDownT=0,endT=0,lastCtl=null;let faceYaw=0;const say=t=>{$('cue').textContent=t;vrText=t},V=(x,y,z)=>new THREE.Vector3(x,y,z);
 const M=(c,r=.7,m=0,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,...o});
 const add=(p,g,m,pos,rot)=>{const o=new THREE.Mesh(g,m);if(pos)o.position.set(...pos);if(rot)o.rotation.set(...rot);p.add(o);return o};
 const box=(p,m,pos,s)=>add(p,new THREE.BoxGeometry(...s),m,pos),cyl=(p,m,pos,r,h,rot,r2)=>add(p,new THREE.CylinderGeometry(r,r2??r,h,18),m,pos,rot);
@@ -208,7 +208,7 @@ addEventListener('keydown',e=>{keys[e.code]=true;if(e.target.closest&&e.target.c
 const ctl=[0,1].map(i=>{const c=ren.xr.getController(i);rig.add(c);c.addEventListener('connected',e=>{c.userData.hand=e.data&&e.data.handedness});c.addEventListener('selectstart',()=>{xrTrig=true;lastCtl=c;if(level===2&&!powerCut&&!held){const o=c.getWorldPosition(V(0,0,0)),dd=V(0,0,-1).applyQuaternion(c.getWorldQuaternion(new THREE.Quaternion()));if(new THREE.Raycaster(o,dd,0,8).intersectObject(isoPx,false).length)cutPower()}});c.addEventListener('selectend',()=>{xrTrig=false});
   c.addEventListener('squeezestart',()=>{lastCtl=c;if(held)drop();else{let best=null,bd=1.1;for(const e of exts){const d=e.g.getWorldPosition(V(0,0,0)).add(V(0,.3,0)).distanceTo(c.getWorldPosition(V(0,0,0)));if(d<bd){bd=d;best=e}}if(best)pickUp(best,c)}});return c});
 ren.xr.addEventListener('sessionstart',()=>{rig.position.set(START.x,0,START.z);cam.position.set(0,0,0);cam.rotation.set(0,0,0);goStation(stationNow())});
-ren.xr.addEventListener('sessionend',()=>{rig.position.set(0,0,0);cam.position.copy(START);look.yaw=0;look.pitch=-.12});
+ren.xr.addEventListener('sessionend',()=>{rig.position.set(0,0,0);rig.rotation.y=0;faceYaw=0;cam.position.copy(START);look.yaw=0;look.pitch=-.12});
 window.setView=n=>{const T=n===1?[-4.7,1,3.1]:[FC.x,.6,FC.z],p=cam.position,dx=T[0]-p.x,dy=T[1]-p.y,dz=T[2]-p.z;look.goal={yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz))}};
 window.act=a=>{if(a==='pick'&&!held){if(hov)pickUp(hov);else if(hovIso)cutPower()}if(a==='drop')drop()};
 const trigNow=()=>down||keys.Space||xrTrig||(conn&&gloveGrip()>.55);
@@ -334,8 +334,22 @@ const vrMode=()=>isVR||ren.xr.isPresenting;
 const FD={A:'paper & cardboard (Class A)',B:'flammable liquid / diesel (Class B, never water)',C:'LIVE electrics (Class C, cut the power first)'};
 const pb=()=>ren.xr.isPresenting?'Squeeze GRIP to put it back.':isVR?'Look straight down to put it back.':'Put it back (Q).';
 const stPos=n=>n==='rack'?V(-3.9,1.6,3.1):n==='iso'?V(2.4,1.6,2):V(FC.x-.48*2.6,1.6,FC.z+.88*2.6);
+/* where each station should face (so the view and the extinguisher start pointing at the thing you need) */
+const stLook=n=>n==='rack'?V(-4.78,1,3.1):n==='iso'?V(4.9,1.4,2):V(FC.x,.4,FC.z);
 const stationNow=()=>held?'fire':(level===2&&!powerCut)?'iso':'rack';
-window.goStation=n=>{if(!vrMode())return;const p=stPos(n);if(ren.xr.isPresenting)rig.position.set(p.x,0,p.z);else cam.position.set(p.x,p.y,p.z);beep(520,.06)};
+window.goStation=n=>{if(!vrMode())return;const p=stPos(n),T=stLook(n),dx=T.x-p.x,dz=T.z-p.z;
+ faceYaw=Math.atan2(-dx,-dz);
+ if(ren.xr.isPresenting){
+  /* turn the rig so the head's current yaw ends up facing the target, and put the HEAD (not the rig origin) on the station */
+  const hy=new THREE.Euler().setFromQuaternion(cam.quaternion,'YXZ').y;
+  rig.rotation.y=faceYaw-hy;
+  const off=V(cam.position.x,0,cam.position.z).applyAxisAngle(V(0,1,0),rig.rotation.y);
+  rig.position.set(p.x-off.x,0,p.z-off.z)}
+ else{
+  cam.position.set(p.x,p.y,p.z);
+  if(gyroOn&&gotO)fixP=true;   /* gyro: re-zero yaw so "straight ahead" = the target */
+  else{look.goal=null;look.yaw=faceYaw;look.pitch=Math.atan2(T.y-p.y,Math.hypot(dx,dz))}}
+ beep(520,.06)};
 const hudC=document.createElement('canvas');hudC.width=1024;hudC.height=320;const hudX=hudC.getContext('2d'),hudT=new THREE.CanvasTexture(hudC);hudT.colorSpace=THREE.SRGBColorSpace;
 const vrHud=new THREE.Mesh(new THREE.PlaneGeometry(1,.3125),new THREE.MeshBasicMaterial({map:hudT,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));vrHud.position.set(0,.3,-1.2);vrHud.renderOrder=1000;vrHud.visible=false;cam.add(vrHud);let hudLast=null;
 function wrapTxt(txt,c,mw){const out=[];let cur='';for(const w of txt.split(' ')){const q=cur?cur+' '+w:w;if(c.measureText(q).width>mw&&cur){out.push(cur);cur=w}else cur=q}if(cur)out.push(cur);return out}
@@ -356,9 +370,9 @@ function renderRoom(){if(!isVR||ren.xr.isPresenting){ren.render(scene,cam);retur
  [stereo.cameraL,stereo.cameraR].forEach((c,i)=>{ren.setRenderTarget(eyeRT);ren.render(scene,c);ren.setRenderTarget(null);distMat.uniforms.sx.value=i?inw:-inw;ren.setScissorTest(true);ren.setViewport(i*w,0,w,h);ren.setScissor(i*w,0,w,h);ren.render(qScene,qCam)});ren.setScissorTest(false)}
 addEventListener('deviceorientation',ev=>{if(!gyroOn||ev.alpha==null)return;gotO=true;const o=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*D;
  eul.set((ev.beta||0)*D,(ev.alpha||0)*D,-(ev.gamma||0)*D,'YXZ');devQ.setFromEuler(eul).multiply(qBack).multiply(new THREE.Quaternion().setFromAxisAngle(V(0,0,1),-o));
- if(fixP){yawFix.setFromAxisAngle(V(0,1,0),-eul.setFromQuaternion(devQ,'YXZ').y);fixP=false}cam.quaternion.copy(yawFix).multiply(devQ)});
+ if(fixP){yawFix.setFromAxisAngle(V(0,1,0),faceYaw-eul.setFromQuaternion(devQ,'YXZ').y);fixP=false}cam.quaternion.copy(yawFix).multiply(devQ)});
 window.recenter=()=>{fixP=true};
-window.resetPosition=()=>{cam.position.copy(START);look.yaw=0;look.pitch=-.12;look.goal=null;fixP=true};
+window.resetPosition=()=>{cam.position.copy(START);look.yaw=0;look.pitch=-.12;look.goal=null;faceYaw=0;fixP=true};
 window.startTraining=()=>{restart();$('ui').classList.add('closed')};
 window.enableGyro=async()=>{if(gyroOn)return;const O=window.DeviceOrientationEvent;
  if(O&&typeof O.requestPermission==='function'){try{if(await O.requestPermission()!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
