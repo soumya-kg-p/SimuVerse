@@ -60,6 +60,7 @@ body.nohud #top,body.nohud #R,body.nohud #bar,body.nohud #L{display:none}
 <aside id="ui" class="card closed" aria-label="Control centre">
 <h3>Glove (ESP32)</h3><label for="ip">Address</label><input id="ip" value="10.82.107.166" inputmode="decimal" autocomplete="off">
 <div class="g2"><button class="p w" onclick="connectESP()">Connect glove</button><button onclick="openGloveData()">Test /data</button><button onclick="disconnectESP()">Disconnect</button><button class="w" onclick="centerGlove()">Centre glove (C)</button></div><p id="help" hidden></p>
+<label for="sens">Glove range (higher = calmer hand)</label><input type="range" id="sens" min="0.7" max="3" step="0.1" value="1.6">
 <h3>Session</h3><div class="g2"><button class="p w" onclick="startTraining()">Start training</button><button onclick="recenter()">Recenter view</button><button onclick="resetPosition()">Reset position</button><button onclick="act('drop')">Put back item</button><button id="gyroBtn" onclick="enableGyro()">Enable gyro</button><button class="p w" onclick="toggleVRBox()">VR Box (phone headset)</button></div>
 <h3>Move (hold)</h3><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
 <details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0–100) per finger.</small><div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div><div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div><div class="g2"><button onclick="saveCal()">Save</button><button onclick="resetCal()">Reset</button></div></details>
@@ -246,8 +247,11 @@ function frame(dt){
   /* VR: no free walking. The trainer moves you between stations automatically. */
   cam.getWorldPosition(camW);cam.updateMatrixWorld(true);
   /* pointer: mouse or glove tilt */
-  const live=conn&&performance.now()-lastAt<1500&&tilt&&tilt0;let tu,tv;if(live){tu=clamp((tilt.roll-tilt0.roll)/.7,-1,1);tv=clamp(-(tilt.pitch-tilt0.pitch)/.7,-1,1)}else{tu=isVR?0:mouse.u;tv=isVR?0:mouse.v}
-  const kk=1-Math.exp(-(live?10:40)*dt);cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;
+  const live=conn&&performance.now()-lastAt<1500&&tilt&&tilt0;let tu,tv;
+  /* glove tilt -> cursor: dead zone (ignores tremor/noise) + adjustable range from the "Glove range" slider */
+  if(live){const R=Number($('sens').value)||1.6,dz=x=>Math.abs(x)<.04?0:x-Math.sign(x)*.04;tu=clamp(dz(tilt.roll-tilt0.roll)/R,-1,1);tv=clamp(-dz(tilt.pitch-tilt0.pitch)/R,-1,1)}else{tu=isVR?0:mouse.u;tv=isVR?0:mouse.v}
+  /* adaptive low-pass: slow motion is heavily smoothed (kills jitter), fast motion stays responsive */
+  const sp=Math.hypot(tu-cur.u,tv-cur.v)/Math.max(dt,.001),rate=live?clamp(2.5+sp*10,2.5,30):40,kk=1-Math.exp(-rate*dt);cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;
   rc.setFromCamera(v2.set(cur.u*(isVR?.25:1),cur.v*(isVR?.25:1)),cam);
   /* hover (inspect) */
   if(!held){const h=xr?null:rc.intersectObjects(proxies,false)[0];hov=h?h.object.userData.ext:null;for(const e of exts)e.body.emissive?.setHex(e===hov?0x444400:(hintOn&&EFF[fireClass][e.kind]>=1?(Math.sin(t*6)>0?0x16a34a:0x0a3a1f):0))}else hov=null;hovIso=!held&&!xr&&level===2&&!powerCut&&camW.distanceTo(isoP)<3.6&&rc.intersectObject(isoPx,false).length>0;isoBody.material.emissive.setHex(hovIso?0x773300:0);
