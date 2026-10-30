@@ -79,6 +79,7 @@ body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px
 <div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
 <div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
 <div class="g2"><button onclick="saveCalibration()">Save</button><button onclick="resetCalibration()">Reset</button></div></details>
+<label for="sens">Glove range (higher = calmer hand)</label><input type="range" id="sens" min="0.7" max="3" step="0.1" value="1.6">
 <details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
 <small><b>Mouse mode:</b> move the cursor to point the hand at a control, hold it briefly, then click (or hold left button / Space) to grab. Click = push / toggle / step knob; drag sideways turns knobs and the window; drag up/down moves throttles and flaps. Arrow keys look around, WASD moves, keys 1–4 jump to panels, Tab swaps hand.</small>
 </aside>
@@ -626,11 +627,14 @@ function dragGrab(){const it=grab,du=cur.u-g0.u,dv=cur.v-g0.v;
 
 function inputStep(dt){
   const A=gloveTilt&&gloveNeutralTilt;live=connected&&performance.now()-lastPacketAt<1500&&A;let tu,tv,g;
-  if(live){tu=clamp((gloveTilt.roll-gloveNeutralTilt.roll)/.7,-1,1);tv=clamp(-(gloveTilt.pitch-gloveNeutralTilt.pitch)/.7,-1,1);g=gloveGripValue()}
+  /* glove tilt -> cursor: dead zone (ignores tremor/noise) + adjustable range from the "Glove range" slider */
+  if(live){const R=Number($('sens').value)||1.6,dz=x=>Math.abs(x)<.04?0:x-Math.sign(x)*.04;
+    tu=clamp(dz(gloveTilt.roll-gloveNeutralTilt.roll)/R,-1,1);
+    tv=clamp(-dz(gloveTilt.pitch-gloveNeutralTilt.pitch)/R,-1,1);g=gloveGripValue()}
   else{if(isVR){tu=0;tv=0}else{tu=mouse.u;tv=mouse.v} /* VR box: the hand follows your gaze (screen centre); tap the screen to grab */
     g=(down.l||down.r||keys.Space)?1:0}
   /* adaptive low-pass (One-Euro style): slow motion is heavily smoothed (kills jitter), fast motion stays responsive */
-  const sp=Math.hypot(tu-cur.u,tv-cur.v)/Math.max(dt,.001),rate=live?clamp(5+sp*14,5,40):40,kk=1-Math.exp(-rate*dt);
+  const sp=Math.hypot(tu-cur.u,tv-cur.v)/Math.max(dt,.001),rate=live?clamp(2.5+sp*10,2.5,30):40,kk=1-Math.exp(-rate*dt);
   cur.u+=(tu-cur.u)*kk;cur.v+=(tv-cur.v)*kk;gripS+=(g-gripS)*(1-Math.exp(-dt*18));
   rc.setFromCamera(v2.set(cur.u*(isVR?.25:1),cur.v*(isVR?.25:1)),cam);dirV.copy(rc.ray.direction);
   const hits=rc.intersectObjects(targets,false);let cand=null;hasHit=false;
