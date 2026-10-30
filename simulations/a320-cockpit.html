@@ -75,11 +75,16 @@ body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px
 <div class="g2"><button onclick="startTraining()">Start training</button><button onclick="restart()">Restart</button><button onclick="recenter()">Recenter view</button><button onclick="resetPosition()">Reset position</button>
 <button class="w" onclick="releaseHeldItem()">Release held control</button><button id="gyroBtn" onclick="enableGyro()">Enable gyro</button><button class="p" onclick="toggleVRBox()">VR Box</button></div>
 <label>Move around (hold)</label><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
+<details open><summary>Aim tuning (glove)</summary>
+<label for="sens">Glove range (lower = more sensitive)</label><input type="range" id="sens" min="0.4" max="2.5" step="0.05" value="0.8">
+<label for="aimAssist">Aim assist (pull toward the next control)</label><input type="range" id="aimAssist" min="0" max="100" value="60">
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aimHold" checked style="width:auto"> Freeze aim while squeezing</label>
+<div class="g2"><button onclick="centerGlove()">Center glove</button><button onclick="resetAim()">Reset aim</button></div>
+<small>Hold your hand level and comfortable, then press Center glove. Re-center whenever you re-grip the glove.</small></details>
 <details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0 to 100) per finger.</small>
 <div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
 <div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
 <div class="g2"><button onclick="saveCalibration()">Save</button><button onclick="resetCalibration()">Reset</button></div></details>
-<label for="sens">Glove range (higher = calmer hand)</label><input type="range" id="sens" min="0.7" max="3" step="0.1" value="1.6">
 <details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
 <small><b>Mouse mode:</b> move the cursor to point the hand at a control, hold it briefly, then click (or hold left button / Space) to grab. Click = push / toggle / step knob; drag sideways turns knobs and the window; drag up/down moves throttles and flaps. Arrow keys look around, WASD moves, keys 1–4 jump to panels, Tab swaps hand.</small>
 </aside>
@@ -149,7 +154,7 @@ body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px
 <table><tr><th>Problem</th><th>Solution</th></tr>
 <tr><td>Hand-tracking jitter</td><td>One-Euro filter on fingertip and wrist (low cutoff when slow, high when fast) — ★ used here; confidence gating (freeze last pose below 0.5); controller fallback; magnet/sticky hover with 150–200 ms release grace.</td></tr>
 <tr><td>Accidental presses in a cramped panel</td><td>Index-tip-only poke collider (3–5 mm); required hover dwell (60–150 ms) before a press counts — ★; press depth + hysteresis; ignore pokes while the hand moves faster than ~1.2 m/s; 150 ms post-release lockout — ★; guarded covers for critical switches (ENG FIRE, EVAC); disable overhead interactors when the head is not looking up; "safe hand" palm-up gesture.</td></tr>
-<tr><td>Input latency</td><td>Run interaction locally (set animation instantly, reconcile with sim); WebSocket/UDP push at 30–60 Hz instead of HTTP polling (original glove poll 500 ms → 80 ms here); batch SimVar reads; avoid per-frame allocations; target 72–90 Hz render, fixed foveated rendering, async reprojection (ATW/ASW); budget: head motion-to-photon &lt; 20 ms, press-to-sim &lt; 100 ms.</td></tr>
+<tr><td>Input latency</td><td>Run interaction locally (set animation instantly, reconcile with sim); WebSocket/UDP push at 30–60 Hz instead of HTTP polling (original glove poll 500 ms → 40 ms here); batch SimVar reads; avoid per-frame allocations; target 72–90 Hz render, fixed foveated rendering, async reprojection (ATW/ASW); budget: head motion-to-photon &lt; 20 ms, press-to-sim &lt; 100 ms.</td></tr>
 <tr><td>Comfort</td><td>No artificial camera motion except slow taxi (world slides at ≤ 15 kt), vignette on speed, 90° snap options, persistent cockpit frame as a visual anchor.</td></tr>
 <tr><td>Performance on Quest</td><td>Baked lighting, texture atlases for panel faces, GPU instancing for switches, LODs on seats/cabin, render screens at 512² and update at 5–10 Hz.</td></tr></table>
 </div></div>
@@ -168,10 +173,15 @@ const fingerAliases={thumb:['thumb','th','f0','t','flex1','flex_1','sensor1','se
 const calibration=Object.fromEntries(fingerKeys.map(k=>[k,{straight:0,bent:100}]));
 try{const s=JSON.parse(localStorage.getItem('anesthesia_calibration')||'null');if(s&&typeof s==='object')for(const k of fingerKeys){const c=s[k];if(c&&Number.isFinite(c.straight)&&Number.isFinite(c.bent)&&c.straight>=0&&c.straight<=100&&c.bent>=0&&c.bent<=100&&c.straight!==c.bent)calibration[k]=c}}catch(e){console.warn('Saved glove calibration could not be loaded.',e)}
 let connected=false,connecting=false,data={},lastPacketAt=0,pollController=null,connectionAttempt=0,gloveTilt=null,gloveNeutralTilt=null,gloveGrab=false;
+/* aim state: AIM.assist = pull strength toward the next control (0..1); AIM.hold = freeze aim while squeezing */
+const AIM={assist:.6,hold:true};
+const aimHist=[];let aimLatched=null,aimOff=null;
+const clearAim=()=>{aimHist.length=0;aimLatched=null;aimOff=null};
+const angDiff=(a,b)=>{let d=a-b;if(d>Math.PI)d-=2*Math.PI;if(d<-Math.PI)d+=2*Math.PI;return d};
 const say=t=>{$('cue').textContent=t};
 window.toggleMenu=()=>{if(document.body.classList.contains('vr'))return;$('ui').classList.toggle('closed')};
 window.toggleBP=()=>{if(document.body.classList.contains('vr'))return;$('bp').classList.toggle('open')};
-window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};say('Glove pose centered. Tilt the glove to steer the hand.')};
+window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};clearAim();say('Glove pose centered. Tilt the glove to steer the hand.')};
 window.saveCalibration=()=>{for(const k of fingerKeys){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter valid straight,bent readings from 0 to 100 for the ${k}.`);return}calibration[k]={straight:p[0],bent:p[1]}}
   try{localStorage.setItem('anesthesia_calibration',JSON.stringify(calibration))}catch(e){say('Calibration could not be saved in this browser.');return}say('Calibration saved. Flex the fingers to verify.')};
 window.resetCalibration=()=>{for(const k of fingerKeys){calibration[k]={straight:0,bent:100};$('cal-'+k).value=''}try{localStorage.removeItem('anesthesia_calibration')}catch(e){}};
@@ -180,10 +190,14 @@ function sensorValue(key,packet=data){for(const src of [packet.flex,packet.finge
   for(const a of fingerAliases[key]){const v=src[a];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v)}}return null}
 function normalizeSensor(key,value){if(!Number.isFinite(value))return null;const c=calibration[key];return clamp((value-c.straight)/(c.bent-c.straight),0,1)}
 const hasValidSensorPacket=p=>fingerKeys.some(k=>sensorValue(k,p)!==null);
+/* tilt is low-pass filtered so accelerometer noise does not make the cursor shake */
 function updateGloveTilt(p){const{ax,ay,az}=p;if(![ax,ay,az].every(v=>Number.isFinite(Number(v))))return;const x=+ax,y=+ay,z=+az;if(Math.hypot(x,y,z)<.1)return;
-  gloveTilt={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
+  const raw={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};
+  if(!gloveTilt)gloveTilt=raw;
+  else{gloveTilt.pitch+=(raw.pitch-gloveTilt.pitch)*.35;gloveTilt.roll+=angDiff(raw.roll,gloveTilt.roll)*.35}
+  if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
 function showConnectionHelp(t){const h=$('help');h.textContent=t;h.hidden=!t}
-const POLL_MS=80; // delay between /data requests (the original used 500)
+const POLL_MS=40; // delay between /data requests (was 80, the original used 500)
 const IPRE=/^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
 const setConn=(on,text)=>{$('dot').classList.toggle('on',on);$('ct').textContent=text};
 function gloveUrl(){
@@ -225,6 +239,14 @@ window.connectESP=async()=>{
 function gloveGripValue(){
   const b=['index','middle','ring'].map(k=>{const r=sensorValue(k);return r===null?null:normalizeSensor(k,r)}).filter(x=>x!==null);
   const fingers=b.length?b.reduce((a,c)=>a+c)/b.length:0;return Math.max(fingers,gloveGrab?.7:0)}
+
+/* aim settings (sliders in the ⚙ menu), remembered in this browser */
+function applyAim(){AIM.assist=Number($('aimAssist').value)/100;AIM.hold=$('aimHold').checked;
+  try{localStorage.setItem('aim_range',$('sens').value);localStorage.setItem('aim_assist',$('aimAssist').value);localStorage.setItem('aim_hold',AIM.hold?'1':'0')}catch(e){}}
+function loadAim(){try{const r=localStorage.getItem('aim_range'),a=localStorage.getItem('aim_assist'),h=localStorage.getItem('aim_hold');
+  if(r!==null)$('sens').value=r;if(a!==null)$('aimAssist').value=a;if(h!==null)$('aimHold').checked=h==='1'}catch(e){}applyAim()}
+window.resetAim=()=>{$('sens').value=.8;$('aimAssist').value=60;$('aimHold').checked=true;applyAim();clearAim()};
+['sens','aimAssist','aimHold'].forEach(id=>$(id).addEventListener('input',applyAim));loadAim();
 
 /* =====================================================================
    SIMULATION: A320 flight deck
@@ -586,7 +608,7 @@ function buildTasks(){tasks.length=0;
   T(6,'Climb away','Keep the sidestick back (about 50 %) and TOGA. Climb to 100 m: the runway drops away below you.',()=>X.alt>=100,()=>null,.2)}
 let ti=0,t=0,elapsed=0,accSum=0,accN=0,pen=0,finished=false,pathD=0,guardT=0,warnT=0,warnMsg='',lastAct='';
 const stepEls=[];$('steps').innerHTML=GROUPS.map(g=>`<li>${g}</li>`).join('');stepEls.push(...$('steps').children);
-window.restart=()=>{ti=0;elapsed=0;accSum=accN=pen=0;finished=false;pathD=0;grab=null;hov=null;
+window.restart=()=>{ti=0;elapsed=0;accSum=accN=pen=0;finished=false;pathD=0;grab=null;hov=null;clearAim();
   for(const it of itemList){it.state=it.shown=it.init;it.dir=1}
   Object.assign(X,{dc:false,ac:false,apu:0,apuAvail:false,starting:false,al:[0,0,0],aligned:false,n1:[0,0],n2:[0,0],run:[false,false],noStart:[0,0],gs:0,trav:0,lat:0,alt:0,pit:0,go:false,fly:false,lining:false});
   buildTasks();ui(true)};
@@ -606,7 +628,7 @@ addEventListener('keydown',e=>{keys[e.code]=true;if(e.target.closest&&e.target.c
   {const vk={Digit1:1,Digit2:2,Digit3:3,Digit4:4,Digit5:5,Numpad5:5,Digit6:6,Numpad6:6,Numpad1:1,Numpad2:2,Numpad3:3,Numpad4:4}[e.code];if(vk)setView(vk)}if(e.code.startsWith('Arrow'))e.preventDefault()});
 addEventListener('keyup',e=>{keys[e.code]=false});addEventListener('blur',()=>{for(const k in keys)keys[k]=false;down.l=down.r=false});
 
-const rc=new THREE.Raycaster();rc.far=3.5;const targets=[...proxies,...SURF],v2=new THREE.Vector2(),dirV=new THREE.Vector3(),tmpV=new THREE.Vector3(),tmpR=new THREE.Vector3(),tmpU=new THREE.Vector3(),tmpW=new THREE.Vector3(),aimV=new THREE.Vector3(),hitPt=new THREE.Vector3();let hasHit=false,prevHit=null;
+const rc=new THREE.Raycaster();rc.far=3.5;const targets=[...proxies,...SURF],v2=new THREE.Vector2(),dirV=new THREE.Vector3(),tmpV=new THREE.Vector3(),tmpR=new THREE.Vector3(),tmpU=new THREE.Vector3(),tmpW=new THREE.Vector3(),aimV=new THREE.Vector3(),aimW=new THREE.Vector3(),hitPt=new THREE.Vector3();let hasHit=false,prevHit=null;
 const vib=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
 const warn=(m,s=1.2)=>{warnMsg=m;warnT=s};
 function beginGrab(it){grab=it;g0={u:cur.u,v:cur.v,state:it.state,moved:0};
@@ -628,9 +650,27 @@ function dragGrab(){const it=grab,du=cur.u-g0.u,dv=cur.v-g0.v;
 function inputStep(dt){
   const A=gloveTilt&&gloveNeutralTilt;live=connected&&performance.now()-lastPacketAt<1500&&A;let tu,tv,g;
   /* glove tilt -> cursor: dead zone (ignores tremor/noise) + adjustable range from the "Glove range" slider */
-  if(live){const R=Number($('sens').value)||1.6,dz=x=>Math.abs(x)<.04?0:x-Math.sign(x)*.04;
-    tu=clamp(dz(gloveTilt.roll-gloveNeutralTilt.roll)/R,-1,1);
-    tv=clamp(-dz(gloveTilt.pitch-gloveNeutralTilt.pitch)/R,-1,1);g=gloveGripValue()}
+  if(live){const R=Number($('sens').value)||.8,dz=x=>Math.abs(x)<.03?0:x-Math.sign(x)*.03;
+    const ru=clamp(dz(angDiff(gloveTilt.roll,gloveNeutralTilt.roll))/R,-1,1);
+    const rv=clamp(-dz(gloveTilt.pitch-gloveNeutralTilt.pitch)/R,-1,1);g=gloveGripValue();
+    if(grab){
+      /* dragging a lever/knob: follow the hand again, but without a jump from the frozen aim */
+      if(aimLatched&&!aimOff)aimOff={u:aimLatched.u-ru,v:aimLatched.v-rv};
+      tu=clamp(ru+(aimOff?aimOff.u:0),-1,1);tv=clamp(rv+(aimOff?aimOff.v:0),-1,1)}
+    else{
+      aimOff=null;
+      if(AIM.hold){
+        /* freeze aim as soon as you start squeezing, so closing the fingers cannot move the cursor */
+        if(g>.12&&!aimLatched&&aimHist.length)aimLatched={...aimHist[0]};
+        if(g<.06)aimLatched=null;
+        if(!aimLatched){aimHist.push({u:ru,v:rv});if(aimHist.length>8)aimHist.shift()}
+        tu=aimLatched?aimLatched.u:ru;tv=aimLatched?aimLatched.v:rv}
+      else{aimLatched=null;tu=ru;tv=rv}
+      /* magnetic aim assist toward the control the procedure is asking for */
+      if(AIM.assist>0&&!finished){const tk=tasks[ti],id=tk?tk.pick():null,it=id?items[id]:null;
+        if(it){it.px.getWorldPosition(aimW);aimW.project(cam);
+          if(aimW.z>-1&&aimW.z<1){const sc=isVR?.25:1,au2=aimW.x/sc,av2=aimW.y/sc,dx=au2-tu,dy=av2-tv,d=Math.hypot(dx,dy),pull=isVR?.6:.3;
+            if(d<pull){const s=AIM.assist*(1-d/pull);tu+=dx*s;tv+=dy*s}}}}}}
   else{if(isVR){tu=0;tv=0}else{tu=mouse.u;tv=mouse.v} /* VR box: the hand follows your gaze (screen centre); tap the screen to grab */
     g=(down.l||down.r||keys.Space)?1:0}
   /* adaptive low-pass (One-Euro style): slow motion is heavily smoothed (kills jitter), fast motion stays responsive */
@@ -641,10 +681,10 @@ function inputStep(dt){
   if(hits.length){hitPt.copy(hits[0].point);hasHit=true;for(const h of hits)if(h.object.userData.item){cand=h.object.userData.item;break}}
   if(!grab){
     if(cand&&cand!==hov){hov=cand;hovT=0;lostT=0}else if(cand){hovT+=dt;lostT=0}
-    else if(hov){lostT+=dt;if(lostT>.18){hov=null;hovT=0}}}
+    else if(hov){lostT+=dt;if(lostT>(live?.3:.18)){hov=null;hovT=0}}}
   lockT=Math.max(0,lockT-dt);guardT=Math.max(0,guardT-dt);
   const was=gOn;if(!gOn&&gripS>.55)gOn=true;else if(gOn&&gripS<.3)gOn=false;
-  if(gOn&&!was){const need=live?.15:.06;
+  if(gOn&&!was){const need=live?.12:.06;
     if(!grab&&lockT<=0&&hov&&hovT>=need)beginGrab(hov);
     else if(!grab&&hov&&hovT<need){guardT=.9;warn('Press ignored: hover on the control first',1)}}
   if(!gOn&&was&&grab)endGrab(false);
@@ -721,7 +761,7 @@ function onOrientation(event){
   cam.quaternion.copy(yawFix).multiply(deviceQ)}
 window.recenter=()=>{recenterPending=true};
 window.resetPosition=()=>{cam.position.copy(HOME);look.yaw=0;look.pitch=-.12;look.goal=null;recenterPending=true};
-window.startTraining=()=>{restart();$('ui').classList.add('closed')};
+window.startTraining=()=>{restart();if(gloveTilt)gloveNeutralTilt={...gloveTilt};$('ui').classList.add('closed')};
 window.enableGyro=async()=>{
   if(gyroEnabled)return;const O=window.DeviceOrientationEvent;
   if(O&&typeof O.requestPermission==='function'){try{const p=await O.requestPermission();if(p!=='granted'){say('Motion permission was denied.');return}}catch(e){say('Could not enable motion controls.');return}}
@@ -785,7 +825,7 @@ function ui(force){
   if(!w&&gripS>.95)w='Squeezing too hard';
   if(!w&&I('park')>.5&&(items.thr1.state>.3||items.thr2.state>.3)&&X.run[0]&&X.run[1])w='Parking brake is set';
   if(!w&&tk&&tk.label==='Taxi thrust'&&items.thr1.state>=.55)w='Too much thrust: pull the throttle back to about 30 %';if(!w&&X.lat>=1&&!X.fly&&I('stick')>.3&&X.gs<120)w='Too early: wait for 140 kt before rotating';$('warn').textContent=w;
-  $('tool').textContent=`${handSide>0?'Right':'Left'} hand · ${grab?'holding '+grab.label+' ('+grab.fmt(grab.state)+')':hov?hov.label+' · '+hov.fmt(hov.state)+(hovT<(live?.15:.06)?' …':' ✓'):lastAct||'point at a control'}`}
+  $('tool').textContent=`${handSide>0?'Right':'Left'} hand · ${grab?'holding '+grab.label+' ('+grab.fmt(grab.state)+')':hov?hov.label+' · '+hov.fmt(hov.state)+(hovT<(live?.12:.06)?' …':' ✓'):lastAct||'point at a control'}`}
 
 scene.updateMatrixWorld(true);resize();restart();
 const clock=new THREE.Clock();
