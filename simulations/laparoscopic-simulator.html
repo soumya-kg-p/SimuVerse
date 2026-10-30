@@ -71,6 +71,12 @@ body.vr #exitVR{display:flex!important;align-items:center;justify-content:center
 <div class="g2"><button onclick="startTraining()">Start training</button><button onclick="restart()">Restart</button><button onclick="recenter()">Recenter view</button><button onclick="resetPosition()">Reset position</button>
 <button class="w" onclick="releaseHeldItem()">Release held tissue</button><button id="gyroBtn" onclick="enableGyro()">Enable gyro</button><button class="p" onclick="toggleVRBox()">VR Box</button></div>
 <label>Move around (hold)</label><div class="mg"><button class="move-btn" data-key="KeyW" aria-label="Forward">▲</button><button class="move-btn" data-key="KeyA" aria-label="Left">◀</button><button class="move-btn" data-key="KeyS" aria-label="Back">▼</button><button class="move-btn" data-key="KeyD" aria-label="Right">▶</button></div>
+<details open><summary>Aim tuning (glove)</summary>
+<label for="aimRange">Sensitivity (right = more sensitive)</label><input type="range" id="aimRange" min="0" max="100" value="60">
+<label for="aimAssist">Aim assist (pull toward target ring)</label><input type="range" id="aimAssist" min="0" max="100" value="60">
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aimHold" checked style="width:auto"> Freeze aim while squeezing</label>
+<div class="g2"><button onclick="centerGlove()">Center glove</button><button onclick="resetAim()">Reset aim</button></div>
+<small>Hold your hand level and comfortable, then press Center glove. Re-center whenever you re-grip.</small></details>
 <details><summary>Sensor calibration</summary><small>Enter straight,bent readings (0 to 100) per finger.</small>
 <div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
 <div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
@@ -97,7 +103,7 @@ try{const s=JSON.parse(localStorage.getItem('anesthesia_calibration')||'null');i
 let connected=false,connecting=false,data={},lastPacketAt=0,pollController=null,connectionAttempt=0,gloveTilt=null,gloveNeutralTilt=null,gloveGrab=false;
 const say=t=>{$('cue').textContent=t};
 window.toggleMenu=()=>{if(document.body.classList.contains('vr'))return;$('ui').classList.toggle('closed')};
-window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};say('Glove pose centered. Tilt the glove to steer the instrument.')};
+window.centerGlove=()=>{if(!gloveTilt){say('Connect the glove and wait for motion readings before centering.');return}gloveNeutralTilt={...gloveTilt};aimHist.length=0;aimLatched=null;say('Glove pose centered. Tilt the glove to steer the instrument.')};
 window.saveCalibration=()=>{for(const k of fingerKeys){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter valid straight,bent readings from 0 to 100 for the ${k}.`);return}calibration[k]={straight:p[0],bent:p[1]}}
   try{localStorage.setItem('anesthesia_calibration',JSON.stringify(calibration))}catch(e){say('Calibration could not be saved in this browser.');return}say('Calibration saved. Flex the fingers to verify.')};
 window.resetCalibration=()=>{for(const k of fingerKeys){calibration[k]={straight:0,bent:100};$('cal-'+k).value=''}try{localStorage.removeItem('anesthesia_calibration')}catch(e){}};
@@ -106,11 +112,15 @@ function sensorValue(key,packet=data){for(const src of [packet.flex,packet.finge
   for(const a of fingerAliases[key]){const v=src[a];if((typeof v==='number'||(typeof v==='string'&&v.trim()!==''))&&Number.isFinite(Number(v)))return Number(v)}}return null}
 function normalizeSensor(key,value){if(!Number.isFinite(value))return null;const c=calibration[key];return clamp((value-c.straight)/(c.bent-c.straight),0,1)}
 const hasValidSensorPacket=p=>fingerKeys.some(k=>sensorValue(k,p)!==null);
+/* Tilt is low-pass filtered so accelerometer noise doesn't make the tip jitter */
 function updateGloveTilt(p){const{ax,ay,az}=p;if(![ax,ay,az].every(v=>Number.isFinite(Number(v))))return;const x=+ax,y=+ay,z=+az;if(Math.hypot(x,y,z)<.1)return;
-  gloveTilt={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
+  const raw={pitch:Math.atan2(-x,Math.hypot(y,z)),roll:Math.atan2(y,z)};
+  if(!gloveTilt)gloveTilt=raw;
+  else{gloveTilt.pitch+=(raw.pitch-gloveTilt.pitch)*.35;gloveTilt.roll+=(raw.roll-gloveTilt.roll)*.35}
+  if(!gloveNeutralTilt)gloveNeutralTilt={...gloveTilt}}
 function showConnectionHelp(t){const h=$('help');h.textContent=t;h.hidden=!t}
 const IPRE=/^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
-const POLL_MS=200;
+const POLL_MS=40;   /* was 200: ~25 readings per second instead of 5 */
 const setConn=(on,text)=>{$('dot').classList.toggle('on',on);$('ct').textContent=text};
 window.disconnectESP=()=>{connectionAttempt++;connected=connecting=gloveGrab=false;if(pollController){pollController.abort();pollController=null}setConn(false,'Glove: not connected (mouse mode)');showConnectionHelp('')};
 window.openGloveData=()=>{const ip=$('ip').value.trim();if(!IPRE.test(ip)){showConnectionHelp('Enter the current IPv4 address printed in the ESP32 Serial Monitor first.');return}window.open(`http://${ip}/data`,'_blank','noopener,noreferrer')};
@@ -139,6 +149,28 @@ window.connectESP=async()=>{
 function gloveGripValue(){
   const b=['index','middle','ring'].map(k=>{const r=sensorValue(k);return r===null?null:normalizeSensor(k,r)}).filter(x=>x!==null);
   const fingers=b.length?b.reduce((a,c)=>a+c)/b.length:0;const light=tasks[ti]&&tasks[ti].mode==='light';return light?Math.min(.5,Math.max(fingers*.6,gloveGrab?.3:0)):Math.max(fingers,gloveGrab?.65:0)}
+
+/* =====================================================================
+   AIM SETTINGS (glove steering)
+   range : tilt (radians) needed to cover the whole screen. Smaller = more sensitive.
+   assist: 0..1 pull strength toward the current target ring.
+   pull  : distance (scene units) within which the assist works.
+   hold  : freeze aim while squeezing so closing the fingers can't move the tip.
+   ===================================================================== */
+const AIM={range:.42,assist:.6,pull:.9,hold:true};
+const aimHist=[];let aimLatched=null;
+function loadAim(){
+  try{const r=localStorage.getItem('aim_range'),a=localStorage.getItem('aim_assist'),h=localStorage.getItem('aim_hold');
+    if(r!==null)$('aimRange').value=r;if(a!==null)$('aimAssist').value=a;if(h!==null)$('aimHold').checked=h==='1'}catch(e){}
+  applyAim()}
+function applyAim(){
+  const r=Number($('aimRange').value),a=Number($('aimAssist').value);
+  AIM.range=.8-(r/100)*.55;          /* slider 0 -> .80 rad (calm), 100 -> .25 rad (very sensitive); default 60 -> ~.47 */
+  AIM.assist=a/100;AIM.hold=$('aimHold').checked;
+  try{localStorage.setItem('aim_range',$('aimRange').value);localStorage.setItem('aim_assist',$('aimAssist').value);localStorage.setItem('aim_hold',AIM.hold?'1':'0')}catch(e){}}
+window.resetAim=()=>{$('aimRange').value=60;$('aimAssist').value=60;$('aimHold').checked=true;applyAim();aimHist.length=0;aimLatched=null};
+['aimRange','aimAssist','aimHold'].forEach(id=>$(id).addEventListener('input',applyAim));
+loadAim();
 
 /* =====================================================================
    SIMULATION: operating theatre + endoscope scene
@@ -295,9 +327,9 @@ function buildTasks(){tasks.length=0;
   T(5,'Extract',0,V(1.0,1.2,.3),'grip',.5,'Switch to the left grasper if needed. Hold firmly and carry the gallbladder to the extraction ring at the upper right.',()=>{gb.visible=false;inst[0].lock=0});
 }
 let ti=0,gbGrasp=false,t=0,elapsed=0,accSum=0,accN=0,pen=0,over=false,active=0,mouse={u:0,v:0,grip:0},finished=false,beepCtx=null;
-window.switchTool=()=>{active=1-active;$('tool').textContent=`Active: ${inst[active].name}`};
+window.switchTool=()=>{active=1-active;aimHist.length=0;aimLatched=null;$('tool').textContent=`Active: ${inst[active].name}`};
 window.restart=()=>{ti=0;gbGrasp=false;elapsed=0;accSum=accN=pen=0;finished=false;gb.visible=true;gb.scale.set(1,1,1);gb.rotation.z=-.25;fibers.forEach(f=>f.visible=true);clips.forEach(c=>c.visible=false);ductFull.visible=true;ductA.visible=ductB.visible=false;
-  inst.forEach((I,i)=>{I.u=toolDefs[i].u;I.v=toolDefs[i].v;I.lock=0;I.grip=0;I.path=0});active=0;$('tool').textContent=`Active: ${inst[0].name}`;buildTasks();ui(true)};
+  inst.forEach((I,i)=>{I.u=toolDefs[i].u;I.v=toolDefs[i].v;I.lock=0;I.grip=0;I.path=0});active=0;aimHist.length=0;aimLatched=null;$('tool').textContent=`Active: ${inst[0].name}`;buildTasks();ui(true)};
 function tick(){try{beepCtx=beepCtx||new AudioContext();const o=beepCtx.createOscillator(),g=beepCtx.createGain();o.frequency.value=880;g.gain.value=.05;o.connect(g).connect(beepCtx.destination);o.start();o.stop(beepCtx.currentTime+.08)}catch(e){}}
 $('steps').innerHTML=GROUPS.map(g=>`<li>${g}</li>`).join('');
 const stepEls=[...$('steps').children];
@@ -318,8 +350,26 @@ function frame(dt){
   t+=dt;if(!finished)elapsed+=dt;moveCamera(dt);
   const live=connected&&performance.now()-lastPacketAt<700&&gloveTilt&&gloveNeutralTilt;
   const A=inst[active];let tu,tv,g;
-  if(live){tu=clamp((gloveTilt.roll-gloveNeutralTilt.roll)/.7,-1,1);tv=clamp(-(gloveTilt.pitch-gloveNeutralTilt.pitch)/.7,-1,1);g=gloveGripValue()}
-  else{tu=mouse.u;tv=mouse.v;const lm=tasks[ti]&&tasks[ti].mode==='light';g=(down.r||(down.l&&(down.shift||lm)))?.3:down.l?.65:0}
+  if(live){
+    const n=gloveNeutralTilt;
+    let ru=clamp((gloveTilt.roll-n.roll)/AIM.range,-1,1), rv=clamp(-(gloveTilt.pitch-n.pitch)/AIM.range,-1,1);
+    if(Math.abs(ru)<.03)ru=0; if(Math.abs(rv)<.03)rv=0;            /* dead zone */
+    g=gloveGripValue();
+    /* Freeze aim when you start squeezing, so closing the fingers can't move the tip */
+    if(AIM.hold){
+      if(g>.12&&!aimLatched&&aimHist.length)aimLatched={...aimHist[0]};
+      if(g<.06)aimLatched=null;
+      if(!aimLatched){aimHist.push({u:ru,v:rv});if(aimHist.length>8)aimHist.shift()}
+    }else aimLatched=null;
+    tu=aimLatched?aimLatched.u:ru; tv=aimLatched?aimLatched.v:rv;
+    /* Magnetic aim assist toward the current target ring */
+    const tk0=tasks[ti];
+    if(tk0&&!finished&&tk0.i===active&&AIM.assist>0){
+      const dx=tk0.pos.x-tu*2, dy=tk0.pos.y-tv*1.5, d=Math.hypot(dx,dy);
+      if(d<AIM.pull){const s=AIM.assist*(1-d/AIM.pull);tu+=dx/2*s;tv+=dy/1.5*s}
+    }
+  }else{
+    tu=mouse.u;tv=mouse.v;const lm=tasks[ti]&&tasks[ti].mode==='light';g=(down.r||(down.l&&(down.shift||lm)))?.3:down.l?.65:0}
   const k=Math.min(1,dt*9);
   for(const I of inst){
     if(I===A){const ou=I.u,ov=I.v;I.u+=(tu-I.u)*k;I.v+=(tv-I.v)*k;I.path+=Math.hypot(I.u-ou,I.v-ov)*2.2;I.grip+=(g-I.grip)*Math.min(1,dt*12)}
@@ -346,8 +396,8 @@ function frame(dt){
   /* gallbladder follows the grasper when held */
   if(gbGrasp&&gb.visible){const tp=inst[0].tip,dx=tp.x-N.x,dy=tp.y-N.y;gb.rotation.z=Math.atan2(dy,dx);gb.scale.x=clamp(Math.hypot(dx,dy)/1.2,.55,1.5)}
   /* task engine */
-  const tk=tasks[ti];let warn='';if(tk&&!finished&&tk.i!==active){active=tk.i;$('tool').textContent=`Active: ${inst[active].name}`}
-  if(tk&&!finished){const I=inst[tk.i],d=Math.hypot(I.tip.x-tk.pos.x,I.tip.y-tk.pos.y),RR=.32,e=I.eff;
+  const tk=tasks[ti];let warn='';if(tk&&!finished&&tk.i!==active){active=tk.i;aimHist.length=0;aimLatched=null;$('tool').textContent=`Active: ${inst[active].name}`}
+  if(tk&&!finished){const I=inst[tk.i],d=Math.hypot(I.tip.x-tk.pos.x,I.tip.y-tk.pos.y),RR=.42,e=I.eff;
     const ok=d<RR&&(tk.mode==='grip'?e>=.5:e>.08&&e<.62);
     if(d<RR){accSum+=1-d/RR;accN++}
     tk.t=ok?tk.t+dt:Math.max(0,tk.t-dt*.5);
@@ -408,7 +458,7 @@ function onOrientation(event){
   cam.quaternion.copy(yawFix).multiply(deviceQ)}
 window.recenter=()=>{recenterPending=true};
 window.resetPosition=()=>{cam.position.set(0,2.0,1.45);cam.rotation.set(-.09,0,0);recenterPending=true};
-window.startTraining=()=>{restart();$('ui').classList.add('closed')};
+window.startTraining=()=>{restart();if(gloveTilt)gloveNeutralTilt={...gloveTilt};$('ui').classList.add('closed')};
 window.releaseHeldItem=()=>{if(!gbGrasp)return;gbGrasp=false;inst[0].lock=0;gb.rotation.z=-.25;gb.scale.set(1,1,1);if(ti<3){ti=0;tasks.forEach(k=>k.t=0)}say('Tissue released. Grasp the fundus again.')};
 window.enableGyro=async()=>{
   if(gyroEnabled)return;const O=window.DeviceOrientationEvent;
