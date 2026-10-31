@@ -52,9 +52,6 @@ body.nohud #top,body.nohud #R,body.nohud #bar,body.nohud #L{display:none}
 <div class="m"><div class="t"><span>Type choice</span><span id="s0">—</span></div></div><div class="m"><div class="t"><span>Aim at base</span><span id="s1">—</span></div></div>
 <div class="m"><div class="t"><span>Sweeping</span><span id="s2">0 passes</span></div></div><div class="m"><div class="t"><span>Time</span><span id="s3">0.0 s</span></div></div>
 <div class="big"><span id="tot">—</span><small> / 100</small></div>
-<h2>Glove</h2><div class="m"><div class="t"><span>Grip</span><span id="gp">0%</span></div></div>
-<div class="m"><div class="t"><span>Thumb</span><span id="fv0">—</span></div><div class="bar"><i class="f" id="fb0"></i></div></div><div class="m"><div class="t"><span>Index</span><span id="fv1">—</span></div><div class="bar"><i class="f" id="fb1"></i></div></div>
-<div class="m"><div class="t"><span>Middle</span><span id="fv2">—</span></div><div class="bar"><i class="f" id="fb2"></i></div></div><div class="m"><div class="t"><span>Ring</span><span id="fv3">—</span></div><div class="bar"><i class="f" id="fb3"></i></div></div>
 <div id="warn"></div><div style="color:var(--dim)"><span id="dot"></span><span id="ct">Glove: not connected (mouse mode)</span></div></aside>
 <nav id="bar" class="card"><button class="ib" onclick="setView(1)"><b>🗄</b>Rack 1</button><button class="ib" onclick="setView(2)"><b>🔥</b>Fire 2</button><button class="ib p" onclick="act('pick')"><b>🧯</b>Pick up E</button><button class="ib" onclick="act('drop')"><b>↩</b>Put back Q</button><button class="ib p" onclick="hint()"><b>💡</b>Hint T</button><button class="ib" onclick="setLevel(1)"><b>①</b>Level 1</button><button class="ib" onclick="setLevel(2)"><b>②</b>Level 2 N</button><button class="ib" onclick="toggleClass()"><b>🔀</b>Fire class F</button><button class="ib" onclick="switchHand()"><b>🧤</b>Hand Tab</button><button class="ib" onclick="restart()"><b>⟳</b>Restart R</button><button class="ib" onclick="$('bp').classList.add('open')"><b>📐</b>Blueprint</button></nav>
 <aside id="ui" class="card closed" aria-label="Control centre">
@@ -137,7 +134,6 @@ window.disconnectESP=()=>{att++;connecting=conn=gClick=false;setC(false,'Glove: 
 window.openGloveData=()=>{const u=gloveUrl();if(!u){help('Enter the glove IP first.');return}open(u,'_blank','noopener')};
 window.saveCal=()=>{for(const k of FK){const v=$('cal-'+k).value.trim();if(!v)continue;const p=v.split(',').map(Number);if(p.length!==2||!p.every(n=>Number.isFinite(n)&&n>=0&&n<=100)||p[0]===p[1]){say(`Enter "straight,bent" (0–100) for the ${k}.`);return}cal[k]={s:p[0],b:p[1]}}try{localStorage.setItem('fx_cal',JSON.stringify(cal))}catch(e){}say('Calibration saved.')};
 window.resetCal=()=>{for(const k of FK){cal[k]={s:0,b:100};$('cal-'+k).value=''}try{localStorage.removeItem('fx_cal')}catch(e){}};
-function gloveHud(){FK.forEach((k,i)=>{const n=bend(k);$('fv'+i).textContent=n===null?'—':Math.round(n*100)+'%';$('fb'+i).style.width=(n||0)*100+'%'});$('gp').textContent=Math.round(grip*100)+'%'}
 
 /* ============ RENDERER / SCENE ============ */
 const ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});ren.setPixelRatio(Math.min(devicePixelRatio,1.8));ren.setSize(innerWidth,innerHeight);
@@ -306,7 +302,7 @@ function frame(dt){
   if(hh>.02&&rnd()<hh*dt*60)spawn(smoke,FC.x+(rnd()-.5)*1.1,.7,FC.z+(rnd()-.5)*1.1,(rnd()-.5)*.2,.5+rnd()*.5,(rnd()-.5)*.2,3.5);
   smoke.pts.material.color.setHex(fireClass==='B'?0x151515:0x4a4a4a);stepPool(agent,dt,9);stepPool(smoke,dt,0);
   if(au){au.hiss.gain.setTargetAtTime(discharging?.12:0,au.c.currentTime,.05);au.fire.gain.setTargetAtTime(hh*.18,au.c.currentTime,.2)}
-  warnT=Math.max(0,warnT-dt);uiT+=dt;if(uiT>.1){uiT=0;ui();gloveHud();vrHudUpdate()}}
+  warnT=Math.max(0,warnT-dt);uiT+=dt;if(uiT>.1){uiT=0;ui();vrHudUpdate()}}
 function bestScore(){let b=total;try{const k='fx_best'+level;b=Math.max(total,+localStorage.getItem(k)||0);localStorage.setItem(k,b)}catch(e){}return b+'.'}
 function scores(){const aim=dT>.3?baseT/dT*100:0,sw=Math.min(100,sweeps/3*100),time=clamp(100-(tm-20)*(100/70),0,100),pen=Math.min(40,burnT*10+(level===2&&!powerCut?15:0));return{type:hinted?Math.min(typeScore??0,60):(typeScore??0),aim,sw,time,pen}}
 function finish(ok,msg){const s=scores();total=ok?Math.round(clamp(.25*s.type+.3*s.aim+.2*s.sw+.25*s.time-s.pen,0,100)):0;beep(ok?1200:300,.4);endT=t;const vq=vrMode();
