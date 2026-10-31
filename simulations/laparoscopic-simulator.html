@@ -52,13 +52,7 @@ body.vr #exitVR{display:flex!important;align-items:center;justify-content:center
 <aside id="L" class="panel" aria-label="Procedure"><h2>Procedure</h2><ol id="steps"></ol>
 <p id="tool-guide"><b>Using the sticks:</b> Tilt the glove (or move the mouse) to steer the active tool tip. Point it at the glowing target ring. Squeeze and hold for a firm grip; partially bend fingers for a light grip. Relax to release. Mouse: hold left for firm grip; Shift+left or right-click for light grip. Tab switches tools.</p>
 <div class="big"><span id="acc">100</span><small>% accuracy</small></div><p id="cue"></p></aside>
-<aside id="R" class="panel" aria-label="Telemetry"><h2>Glove telemetry</h2>
-<div class="m"><div class="t"><span>Left grasper force</span><span id="f0">0.0 N</span></div><div class="bar f"><i id="b0"></i></div></div>
-<div class="m"><div class="t"><span>Right hook force</span><span id="f1">0.0 N</span></div><div class="bar f"><i id="b1"></i></div></div>
-<div class="m"><div class="t"><span>Thumb</span><span id="v0">—</span></div><div class="bar f"><i id="s0"></i></div></div>
-<div class="m"><div class="t"><span>Index</span><span id="v1">—</span></div><div class="bar f"><i id="s1"></i></div></div>
-<div class="m"><div class="t"><span>Middle</span><span id="v2">—</span></div><div class="bar f"><i id="s2"></i></div></div>
-<div class="m"><div class="t"><span>Ring</span><span id="v3">—</span></div><div class="bar f"><i id="s3"></i></div></div>
+<aside id="R" class="panel" aria-label="Status"><h2>Status</h2>
 <div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Time</span><span id="tm">0:00</span></div>
 <div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Instrument path</span><span id="pth">0.0 m</span></div>
 <div id="warn"></div><div id="conn" style="margin-top:6px;color:var(--dim)"><span id="dot"></span><span id="ct">Glove: not connected (mouse mode)</span></div></aside>
@@ -494,8 +488,6 @@ function ui(force,warn){
   const tk=tasks[ti],gi=finished?GROUPS.length:tk?tk.g:0;
   if(force||ui.g!==gi){ui.g=gi;stepEls.forEach((e,i)=>e.className=i<gi?'done':i===gi?'cur':'')}
   $('acc').textContent=accuracy()|0;if(tk&&!finished)say(tk.cue);else if(finished)say(`Complete in ${fmt(elapsed)} with ${accuracy()|0}% accuracy. Press Restart to repeat.`);
-  inst.forEach((I,i)=>{$('f'+i).textContent=I.force.toFixed(1)+' N';const b=$('b'+i);b.style.width=clamp(I.force/6*100,0,100)+'%';b.className=I.force>4.4?'hot':''});
-  fingerKeys.forEach((k,i)=>{const r=sensorValue(k),n=r===null?0:normalizeSensor(k,r);$('v'+i).textContent=r===null?'—':`${Math.round(r)} / ${Math.round(n*100)}%`;$('s'+i).style.width=n*100+'%'});
   $('tm').textContent=fmt(elapsed);$('pth').textContent=(inst[0].path+inst[1].path).toFixed(1)+' m';$('warn').textContent=warn||''}
 const fmt=s=>`${s/60|0}:${String(s%60|0).padStart(2,'0')}`;
 const clock=new THREE.Clock();
