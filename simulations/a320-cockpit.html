@@ -79,7 +79,7 @@ body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px
 <div class="cal"><span>Thumb</span><input id="cal-thumb" placeholder="0,100"></div><div class="cal"><span>Index</span><input id="cal-index" placeholder="0,100"></div>
 <div class="cal"><span>Middle</span><input id="cal-middle" placeholder="0,100"></div><div class="cal"><span>Ring</span><input id="cal-ring" placeholder="0,100"></div>
 <div class="g2"><button onclick="saveCalibration()">Save</button><button onclick="resetCalibration()">Reset</button></div></details>
-<details><summary>VR tuning</summary><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
+<details><summary>VR tuning</summary><label for="vrq">VR sharpness (render resolution, lower if laggy)</label><input type="range" id="vrq" min="60" max="200" value="130"><label for="lens">Lens correction</label><input type="range" id="lens" min="0" max="100" value="50"><label for="align">Eye alignment</label><input type="range" id="align" min="0" max="15" value="5"></details>
 <small><b>Mouse mode:</b> move the cursor to point the hand at a control, hold it briefly, then click (or hold left button / Space) to grab. Click = push / toggle / step knob; drag sideways turns knobs and the window; drag up/down moves throttles and flaps. Arrow keys look around, WASD moves, keys 1–4 jump to panels, Tab swaps hand.</small>
 </aside>
 <button id="exitVR" onclick="toggleVRBox()" aria-label="Exit VR">✕</button>
@@ -258,6 +258,7 @@ function noiseTex(base,jit,n=700){const c=document.createElement('canvas');c.wid
 const ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 ren.setPixelRatio(Math.min(devicePixelRatio,1.8));ren.setSize(innerWidth,innerHeight);ren.outputColorSpace=THREE.SRGBColorSpace;
 ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.0;document.body.prepend(ren.domElement);
+const MAXA=ren.capabilities.getMaxAnisotropy();
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xbcd6e8);scene.fog=new THREE.Fog(0xcfdfe8,70,280);
 const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.03,400);cam.rotation.order='YXZ';scene.add(cam);
@@ -336,16 +337,16 @@ const SURF=[mpBoard,ohBoard,pedestal];
 /* ---------- labels / faces ---------- */
 const lbls=[];
 function label(p,text,x,y,z,w,h,mode,col='#e6eef0',px){
-  const c=document.createElement('canvas');c.width=Math.max(32,Math.round(w*1600));c.height=Math.max(16,Math.round(h*1600));const g=c.getContext('2d');
+  const c=document.createElement('canvas');c.width=Math.max(32,Math.round(w*2400));c.height=Math.max(16,Math.round(h*2400));const g=c.getContext('2d');
   let sz=px||Math.round(c.height*.66);g.font=`700 ${sz}px sans-serif`;while(g.measureText(text).width>c.width*.95&&sz>6){sz--;g.font=`700 ${sz}px sans-serif`}
   g.fillStyle=col;g.textAlign='center';g.textBaseline='middle';g.fillText(text,c.width/2,c.height/2+1);
-  const tx=new THREE.CanvasTexture(c);tx.colorSpace=THREE.SRGBColorSpace;tx.anisotropy=4;
+  const tx=new THREE.CanvasTexture(c);tx.colorSpace=THREE.SRGBColorSpace;tx.anisotropy=MAXA;
   const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tx,transparent:true,toneMapped:false,depthWrite:false}));
   m.position.set(x,y,z);m.rotation.x=mode==='oh'?Math.PI/2:-Math.PI/2;p.add(m);lbls.push(m);return m}
 const ftc={};
-function faceTex(txt,fg,bg='#10181b'){const k=txt+fg+bg;if(ftc[k])return ftc[k];const c=document.createElement('canvas');c.width=128;c.height=96;const x=c.getContext('2d');
+function faceTex(txt,fg,bg='#10181b'){const k=txt+fg+bg;if(ftc[k])return ftc[k];const c=document.createElement('canvas');c.width=256;c.height=192;const x=c.getContext('2d');x.scale(2,2);
   x.fillStyle=bg;x.fillRect(0,0,128,96);x.strokeStyle='#3b4a50';x.lineWidth=4;x.strokeRect(2,2,124,92);x.fillStyle=fg;x.font='700 36px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,64,50);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return ftc[k]=t}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=MAXA;return ftc[k]=t}
 function section(x,z,w,d,title){box(OH,M(0x27323a,.8),[x,-.016,z],[w,.002,d]);label(OH,title,x,-.0182,z+d/2-.016,w,.026,'oh','#7fa3ad',18)}
 
 /* ---------- interactable registry ---------- */
@@ -401,7 +402,7 @@ const sunSp=new THREE.SpotLight(0xfff0d0,4,9,.55,.7,1.2);sunSp.position.set(-1.6
 const glow=c=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
 const lcd=(w,h,cells)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#06090b';x.fillRect(0,0,w,h);x.textAlign='center';
   cells.forEach(([a,b,col],i)=>{const cx=(i+.5)*w/cells.length;x.font='700 '+h*.2+'px sans-serif';x.fillStyle='#d6e4e8';x.fillText(a,cx,h*.28);x.font='700 '+h*.42+'px monospace';x.fillStyle=col||'#ffb547';x.fillText(b,cx,h*.8)});
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t};
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=MAXA;return t};
 function glarePanel(x,w,cells,nk,btns){const g=new THREE.Group();g.position.set(x,1.315,-.48);g.rotation.x=.5;scene.add(g);box(g,M(0x10171d,.5),[0,0,0],[w,.02,.13]);
   const m=new THREE.Mesh(new THREE.PlaneGeometry(w-.04,.05),new THREE.MeshBasicMaterial({map:lcd(512,96,cells),toneMapped:false}));m.rotation.x=-Math.PI/2;m.position.set(0,.0105,-.03);g.add(m);
   for(let i=0;i<nk;i++){const kx=(i+.5)*w/nk-w/2;cyl(g,M(0x3b4850,.4,.3),[kx,.02,.03],.016,.024);box(g,glow(0xf2f2f2),[kx,.034,.03],[.003,.002,.014])}
@@ -512,9 +513,9 @@ function systems(dt){
     if(X.fly){X.pit+=(st*.28-X.pit)*Math.min(1,dt*1.2);X.alt=Math.min(400,X.alt+Math.sin(X.pit)*X.gs*.514*dt)}}
   const le=X.lat*X.lat*(3-2*X.lat);outside.position.set(-RX*le,-X.alt,0);outside.rotation.x=-X.pit}
 
-/* ---------- cockpit screens ---------- */
+/* ---------- cockpit screens (512 px canvases, drawn in 256-unit coordinates via scale(2,2)) ---------- */
 const scrs={};
-function placeScr(name,x,y){const c=document.createElement('canvas');c.width=c.height=256;const s={c,x:c.getContext('2d'),tx:new THREE.CanvasTexture(c)};s.tx.colorSpace=THREE.SRGBColorSpace;scrs[name]=s;
+function placeScr(name,x,y){const c=document.createElement('canvas');c.width=c.height=512;const s={c,x:c.getContext('2d'),tx:new THREE.CanvasTexture(c)};s.x.scale(2,2);s.tx.anisotropy=MAXA;s.tx.colorSpace=THREE.SRGBColorSpace;scrs[name]=s;
   box(MP,M(0x0a0e10,.5),[x,y,.016],[.215,.215,.012]);const m=new THREE.Mesh(new THREE.PlaneGeometry(.19,.19),new THREE.MeshBasicMaterial({map:s.tx,toneMapped:false}));m.position.set(x,y,.0235);MP.add(m)}
 placeScr('pfd1',-.68,.07);placeScr('nd1',-.44,.07);placeScr('ewd',0,.12);placeScr('sd',0,-.105);placeScr('nd2',.44,.07);placeScr('pfd2',.68,.07);
 for(const[t,x,y,w]of[['CAPT PFD',-.68,-.065,.2],['CAPT ND',-.44,-.065,.2],['E/WD',-.17,.12,.07],['SD',-.17,-.105,.07],['F/O ND',.44,-.065,.2],['F/O PFD',.68,-.065,.2]]){const m=label(MP,t,x,y,.0215,w,.03,'oh','#7fa3ad',20);m.rotation.x=0}
@@ -721,7 +722,10 @@ function moveCamera(dt){
 let isVR=false,gyroEnabled=false,gotOrientation=false,recenterPending=false;
 const D2R=Math.PI/180,yawFix=new THREE.Quaternion(),deviceQ=new THREE.Quaternion(),tmpEuler=new THREE.Euler(),qBack=new THREE.Quaternion(-Math.SQRT1_2,0,0,Math.SQRT1_2);
 const stereo=new THREE.StereoCamera();stereo.aspect=.5;stereo.eyeSep=.064;
-const eyeRT=new THREE.WebGLRenderTarget(512,512);
+/* eye buffer: 4x MSAA + half-float colour (falls back to 8-bit if the device cannot render to float targets) */
+const hf=ren.capabilities.isWebGL2&&(ren.extensions.has('EXT_color_buffer_float')||ren.extensions.has('EXT_color_buffer_half_float'));
+const eyeRT=new THREE.WebGLRenderTarget(1024,1024,{samples:4,type:hf?THREE.HalfFloatType:THREE.UnsignedByteType});
+eyeRT.texture.generateMipmaps=false;
 const distMat=new THREE.ShaderMaterial({uniforms:{t:{value:eyeRT.texture},k:{value:.25},sx:{value:0}},
   vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
   fragmentShader:['uniform sampler2D t;uniform float k;uniform float sx;varying vec2 v;','void main(){vec2 c=v*2.-1.;vec2 d=c*(1.+k*dot(c,c));vec2 u=d*.5+.5+vec2(sx,0.);','gl_FragColor=(u.x<0.||u.x>1.||u.y<0.||u.y>1.)?vec4(0.,0.,0.,1.):texture2D(t,u);','#include <tonemapping_fragment>','#include <colorspace_fragment>','}'].join('\n')});
@@ -730,17 +734,18 @@ const qScene=new THREE.Scene();qScene.add(new THREE.Mesh(new THREE.PlaneGeometry
    each eye is a SQUARE view = 0.815 x screen height, eye centres sit 0.43 x height either side of the
    screen centre line and 0.543 x height from the top, everything else is pure black. */
 const VRL={size:.815,sep:.43,cy:.543};
-function resize(){const vw=innerWidth,vh=innerHeight;cam.aspect=isVR?1:vw/vh;stereo.aspect=1;cam.fov=isVR?90:70;cam.updateProjectionMatrix();ren.setSize(vw,vh)}
+function resize(){const vw=innerWidth,vh=innerHeight;cam.aspect=isVR?1:vw/vh;stereo.aspect=1;cam.fov=isVR?90:70;cam.updateProjectionMatrix();ren.setPixelRatio(isVR?Math.min(devicePixelRatio,2.5):Math.min(devicePixelRatio,1.8));ren.setSize(vw,vh)}
 function renderRoom(){
   if(!isVR){ren.setRenderTarget(null);ren.setScissorTest(false);ren.setViewport(0,0,innerWidth,innerHeight);ren.render(scene,cam);return}
   const W=innerWidth,H=innerHeight,pr=ren.getPixelRatio(),side=Math.round(H*VRL.size),cx=W/2,cy=H*VRL.cy;
   cam.aspect=1;cam.updateProjectionMatrix();stereo.aspect=1;
-  const px=Math.max(2,Math.round(side*pr));if(eyeRT.width!==px)eyeRT.setSize(px,px);
+  const q=Number($('vrq').value)/100,maxT=Math.min(4096,ren.capabilities.maxTextureSize);
+  const px=Math.min(maxT,Math.max(2,Math.round(side*pr*q)));if(eyeRT.width!==px)eyeRT.setSize(px,px);
   cam.updateMatrixWorld();stereo.update(cam);
   distMat.uniforms.k.value=Number($('lens').value)/100*.5;const off=(Number($('align').value)-5)*.012;
   ren.setRenderTarget(null);ren.setScissorTest(false);ren.setViewport(0,0,W,H);ren.setClearColor(0x000000,1);ren.clear(); /* black everywhere outside the two eye views */
   [stereo.cameraL,stereo.cameraR].forEach((c,i)=>{
-    ren.setRenderTarget(eyeRT);ren.setViewport(0,0,side,side);ren.setScissorTest(false);ren.render(scene,c);ren.setRenderTarget(null);
+    ren.setRenderTarget(eyeRT);ren.setScissorTest(false);ren.render(scene,c);ren.setRenderTarget(null);
     const ex=Math.round(cx+(i?1:-1)*H*VRL.sep-side/2),ey=Math.round(H-cy-side/2); /* GL origin is bottom-left */
     distMat.uniforms.sx.value=i?-off:off;ren.setScissorTest(true);ren.setViewport(ex,ey,side,side);ren.setScissor(ex,ey,side,side);ren.render(qScene,qCam)});
   ren.setScissorTest(false);ren.setViewport(0,0,W,H)}
