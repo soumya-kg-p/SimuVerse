@@ -56,13 +56,7 @@ body.vr #exitVR{display:block;opacity:.35;width:34px;height:34px;min-height:34px
 <button id="menuBtn" onclick="toggleMenu()" aria-label="Glove connection and calibration">⚙</button>
 <aside id="L" class="panel" aria-label="Procedure"><h2>Cold &amp; dark → takeoff</h2><ol id="steps"></ol>
 <div class="big"><span id="acc">100</span><small>% accuracy</small></div><p id="cue"></p></aside>
-<aside id="R" class="panel" aria-label="Telemetry"><h2>Glove telemetry</h2>
-<div class="m"><div class="t"><span>Grip pressure</span><span id="f0">0.0 N</span></div><div class="bar f"><i id="b0"></i></div></div>
-<div class="m"><div class="t"><span>Control load</span><span id="f1">0.0 N</span></div><div class="bar f"><i id="b1"></i></div></div>
-<div class="m"><div class="t"><span>Thumb</span><span id="v0">—</span></div><div class="bar f"><i id="s0"></i></div></div>
-<div class="m"><div class="t"><span>Index</span><span id="v1">—</span></div><div class="bar f"><i id="s1"></i></div></div>
-<div class="m"><div class="t"><span>Middle</span><span id="v2">—</span></div><div class="bar f"><i id="s2"></i></div></div>
-<div class="m"><div class="t"><span>Ring</span><span id="v3">—</span></div><div class="bar f"><i id="s3"></i></div></div>
+<aside id="R" class="panel" aria-label="Status"><h2>Status</h2>
 <div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Time</span><span id="tm">0:00</span></div>
 <div class="t" style="display:flex;justify-content:space-between;color:var(--dim)"><span>Hand travel</span><span id="pth">0.0 m</span></div>
 <div id="warn"></div><div id="conn" style="margin-top:6px;color:var(--dim)"><span id="dot"></span><span id="ct">Glove: not connected (mouse mode)</span></div></aside>
@@ -816,9 +810,6 @@ function ui(force){
   const lab=tk&&!finished?tk.label:'';if(force||ui.l!==lab||ui.gg!==gi){ui.l=lab;ui.gg=gi;stepEls.forEach((e,i)=>e.innerHTML=GROUPS[i]+(i===gi&&lab?`<br><small style="color:var(--amber)">▸ ${lab}</small>`:''))}
   $('acc').textContent=accuracy()|0;
   if(tk&&!finished)say(`${tk.label}: ${tk.cue}`);else if(finished)say(`Airborne in ${fmt(elapsed)} with ${accuracy()|0}% accuracy. Press Restart to repeat.`);
-  const gp=gripS*30,ld=grab?grab.load*(.6+gripS*.4):0;$('f0').textContent=gp.toFixed(1)+' N';$('b0').style.width=clamp(gp/30*100,0,100)+'%';$('b0').className=gp>26?'hot':'';
-  $('f1').textContent=ld.toFixed(1)+' N';$('b1').style.width=clamp(ld/16*100,0,100)+'%';
-  fingerKeys.forEach((k,i)=>{const r=sensorValue(k),n=r===null?0:normalizeSensor(k,r);$('v'+i).textContent=r===null?'—':`${Math.round(r)} / ${Math.round(n*100)}%`;$('s'+i).style.width=n*100+'%'});
   $('tm').textContent=fmt(elapsed);$('pth').textContent=pathD.toFixed(1)+' m';
   let w=warnT>0?warnMsg:'';
   for(let e=0;e<2;e++)if(!w&&X.noStart[e]>4)w=`ENG ${e+1}: no start. Need APU BLEED ON, ENG MODE IGN, fuel pump ON.`;
